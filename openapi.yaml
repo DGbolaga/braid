@@ -1,0 +1,1168 @@
+openapi: 3.1.0
+
+info:
+  title: Braid API
+  version: 0.1.0
+  description: |
+    Thin vertical slice: program lookup, application intake, magic-link auth,
+    roster, matching runs with a fairness summary, and strands with messages.
+
+    Deliberately excluded until the step that needs them: the published form
+    schema (the apply screen currently renders a hardcoded form), and the
+    pair-level run actions (swap, lock, reject, re-run).
+
+servers:
+  - url: http://localhost:8000/v1
+    description: Local FastAPI
+  - url: https://api.braid.app/v1
+    description: Production
+
+security:
+  - sessionCookie: []
+
+tags:
+  - name: Public
+    description: No session required. Reachable from a cold link.
+  - name: Auth
+    description: Magic-link sign in.
+  - name: Roster
+    description: Approved participants in a program.
+  - name: Matching
+    description: Batch runs, their fairness summaries, and publication.
+  - name: Strands
+    description: Mentoring relationships and their message threads.
+
+paths:
+  /orgs/{orgSlug}/programs/{programSlug}:
+    parameters:
+      - $ref: "#/components/parameters/OrgSlug"
+      - $ref: "#/components/parameters/ProgramSlug"
+    get:
+      operationId: getProgramBySlug
+      tags: [Public]
+      summary: Look up a program for its landing page
+      description: |
+        A closed or full program still resolves, carrying the state that lets the
+        landing page offer a waitlist rather than a 404.
+      security: []
+      responses:
+        "200":
+          description: The program
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgramPublic"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orgs/{orgSlug}/programs/{programSlug}/applications:
+    parameters:
+      - $ref: "#/components/parameters/OrgSlug"
+      - $ref: "#/components/parameters/ProgramSlug"
+    post:
+      operationId: submitApplication
+      tags: [Public]
+      summary: Submit an application to a program
+      description: |
+        Answers are keyed by question id. The slice runs on a hardcoded form, so
+        no schema is fetched first; the shape already accommodates the published
+        schema arriving later.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationCreate"
+      responses:
+        "201":
+          description: Application received
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Applications are closed, or this email already applied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /applications/{applicationId}:
+    parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getApplication
+      tags: [Public]
+      summary: Read an application's status
+      description: |
+        Backs the "what happens next" screen after submitting.
+
+        Access control note: this route is keyed by a raw UUID and requires no
+        session, which is acceptable for the mocked slice but is a real access
+        control hole. In production the emailed link carries a signed,
+        expiring token scoped to this one application, and the raw UUID stops
+        being a valid credential.
+      security: []
+      responses:
+        "200":
+          description: The application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /auth/magic-link:
+    post:
+      operationId: requestMagicLink
+      tags: [Auth]
+      summary: Email a sign-in link
+      description: |
+        Always returns 202, whether or not an account exists for the address.
+        A 404 here would turn the endpoint into an account-enumeration oracle.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MagicLinkRequest"
+      responses:
+        "202":
+          description: Accepted. A link is sent only if the address has an account.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/verify:
+    post:
+      operationId: verifyMagicLink
+      tags: [Auth]
+      summary: Consume a magic-link token and open a session
+      description: Sets the `braid_session` cookie. Tokens are single use.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyRequest"
+      responses:
+        "200":
+          description: Session opened
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              example: braid_session=…; HttpOnly; Secure; SameSite=Lax; Path=/
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "410":
+          description: Token expired or already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /auth/session:
+    get:
+      operationId: getSession
+      tags: [Auth]
+      summary: Resolve the current account and its participations
+      description: |
+        Every authenticated page depends on this: it resolves the account, the
+        programs it belongs to, and the role held in each.
+      responses:
+        "200":
+          description: The current session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /programs/{programId}/roster:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listRoster
+      tags: [Roster]
+      summary: List approved participants in a program
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/Role"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ParticipationStatus"
+        - name: matched
+          in: query
+          description: Filter to participants who do or do not hold a strand.
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of the roster
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RosterPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/runs:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listRuns
+      tags: [Matching]
+      summary: List matching runs for a program
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of runs, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createRun
+      tags: [Matching]
+      summary: Start a matching run
+      description: |
+        Returns immediately with state `queued`. A run is a stored object with a
+        lifecycle, not a function call: poll the run to follow it to `drafted`.
+      responses:
+        "202":
+          description: Run queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Run"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A run is already in progress for this program
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /runs/{runId}:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    get:
+      operationId: getRun
+      tags: [Matching]
+      summary: Read a run, its fairness summary, and its draft pairs
+      description: |
+        While the run is `queued` or `running`, `progress` advances from 0 to 1
+        and `fairnessSummary` is null. Both are populated once it reaches
+        `drafted`.
+      responses:
+        "200":
+          description: The run
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /runs/{runId}/publish:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    post:
+      operationId: publishRun
+      tags: [Matching]
+      summary: Publish a drafted run
+      description: |
+        Irreversible. Converts every draft pair into an active strand and
+        notifies both sides.
+      responses:
+        "200":
+          description: Run published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunDetail"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Run is not in a publishable state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /programs/{programId}/strands:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listStrands
+      tags: [Strands]
+      summary: List the strands the current account holds in a program
+      parameters:
+        - name: state
+          in: query
+          schema:
+            $ref: "#/components/schemas/StrandState"
+      responses:
+        "200":
+          description: The strands
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StrandSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /strands/{strandId}:
+    parameters:
+      - $ref: "#/components/parameters/StrandId"
+    get:
+      operationId: getStrand
+      tags: [Strands]
+      summary: Read one strand
+      responses:
+        "200":
+          description: The strand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strand"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /strands/{strandId}/messages:
+    parameters:
+      - $ref: "#/components/parameters/StrandId"
+    get:
+      operationId: listMessages
+      tags: [Strands]
+      summary: Read a strand's message thread
+      description: Newest last. Page backwards with `before`.
+      parameters:
+        - name: before
+          in: query
+          description: Return messages sent before this message id.
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: A page of messages
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagePage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: sendMessage
+      tags: [Strands]
+      summary: Send a message to a strand
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageCreate"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: braid_session
+
+  parameters:
+    OrgSlug:
+      name: orgSlug
+      in: path
+      required: true
+      schema:
+        type: string
+    ProgramSlug:
+      name: programSlug
+      in: path
+      required: true
+      schema:
+        type: string
+    ProgramId:
+      name: programId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RunId:
+      name: runId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    StrandId:
+      name: strandId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 25
+
+  responses:
+    BadRequest:
+      description: The request failed validation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: No valid session
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: Signed in, but not permitted here
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: No such resource
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    TooManyRequests:
+      description: Rate limited
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  schemas:
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable identifier, e.g. `applications_closed`.
+        message:
+          type: string
+          description: Sentence-case text safe to show a person.
+        field:
+          type: string
+          description: Present when the failure belongs to one input.
+
+    Role:
+      type: string
+      enum: [mentor, mentee]
+
+    ParticipationStatus:
+      type: string
+      enum: [invited, applied, approved, waitlisted, removed]
+
+    ApplicationStatus:
+      type: string
+      enum: [submitted, under_review, approved, waitlisted, rejected]
+
+    ProgramState:
+      type: string
+      enum: [not_yet_open, open, closed, full]
+
+    RunState:
+      type: string
+      enum: [queued, running, drafted, published, discarded]
+
+    StrandState:
+      type: string
+      enum: [draft, active, paused, ended, discarded]
+
+    OriginMode:
+      type: string
+      enum: [manual, self, batch]
+
+    PriorityBand:
+      type: string
+      enum: [high, medium, low]
+
+    AnswerValue:
+      description: One answer to one question.
+      oneOf:
+        - type: string
+        - type: number
+        - type: boolean
+        - type: array
+          items:
+            type: string
+
+    Organisation:
+      type: object
+      required: [id, slug, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+        logoUrl:
+          type: [string, "null"]
+          format: uri
+
+    ProgramPublic:
+      type: object
+      required:
+        [
+          id,
+          slug,
+          name,
+          organisation,
+          description,
+          state,
+          openRoles,
+          mentorCount,
+          menteeCount,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        name:
+          type: string
+        organisation:
+          $ref: "#/components/schemas/Organisation"
+        description:
+          type: string
+        state:
+          $ref: "#/components/schemas/ProgramState"
+        cohortStart:
+          type: [string, "null"]
+          format: date
+        cohortEnd:
+          type: [string, "null"]
+          format: date
+        applicationsCloseAt:
+          type: [string, "null"]
+          format: date-time
+        matchingOpensAt:
+          type: [string, "null"]
+          format: date-time
+        timeCommitment:
+          type: [string, "null"]
+          description: Plain words, e.g. "About two hours a month for six months".
+        eligibility:
+          type: [string, "null"]
+        openRoles:
+          type: array
+          items:
+            $ref: "#/components/schemas/Role"
+        mentorCount:
+          type: integer
+        menteeCount:
+          type: integer
+
+    ApplicationCreate:
+      type: object
+      required: [role, name, email, answers]
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        answers:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AnswerValue"
+
+    Application:
+      type: object
+      required: [id, programId, role, name, email, status, submittedAt, answers]
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        programName:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        submittedAt:
+          type: string
+          format: date-time
+        editableUntil:
+          type: [string, "null"]
+          format: date-time
+        matchingOpensAt:
+          type: [string, "null"]
+          format: date-time
+        answers:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AnswerValue"
+
+    MagicLinkRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+        orgSlug:
+          type: string
+          description: Return the person to this program after verifying.
+        programSlug:
+          type: string
+
+    VerifyRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+
+    Account:
+      type: object
+      required: [id, name, email, emailVerified]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        emailVerified:
+          type: boolean
+        photoUrl:
+          type: [string, "null"]
+          format: uri
+
+    ParticipationSummary:
+      type: object
+      required: [id, programId, programName, orgSlug, programSlug, role, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        programName:
+          type: string
+        organisationName:
+          type: string
+        orgSlug:
+          type: string
+        programSlug:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        status:
+          $ref: "#/components/schemas/ParticipationStatus"
+        isCoordinator:
+          type: boolean
+          default: false
+
+    Session:
+      type: object
+      required: [account, participations]
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        participations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ParticipationSummary"
+
+    RosterEntry:
+      type: object
+      required:
+        [id, account, role, status, matched, profileCompleteness, joinedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The participation id, not the account id.
+        account:
+          $ref: "#/components/schemas/Account"
+        role:
+          $ref: "#/components/schemas/Role"
+        status:
+          $ref: "#/components/schemas/ParticipationStatus"
+        matched:
+          type: boolean
+        capacity:
+          type: [integer, "null"]
+          description: Mentors only. How many mentees they will take.
+        load:
+          type: [integer, "null"]
+          description: Mentors only. Active strands held. May exceed capacity.
+        profileCompleteness:
+          type: number
+          minimum: 0
+          maximum: 1
+        timezone:
+          type: [string, "null"]
+          description: IANA name, e.g. Africa/Lagos.
+        joinedAt:
+          type: string
+          format: date-time
+
+    RosterPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RosterEntry"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+
+    PersonRef:
+      type: object
+      required: [participationId, name]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        photoUrl:
+          type: [string, "null"]
+          format: uri
+
+    MentorLoad:
+      type: object
+      required: [mentor, load, capacity]
+      properties:
+        mentor:
+          $ref: "#/components/schemas/PersonRef"
+        load:
+          type: integer
+        capacity:
+          type: integer
+
+    PriorityBandStat:
+      type: object
+      required: [band, menteeCount, meanScore, medianScore]
+      description: |
+        The comparison that makes a run defensible: whether high-priority
+        mentees came out with match quality comparable to low-priority ones.
+      properties:
+        band:
+          $ref: "#/components/schemas/PriorityBand"
+        menteeCount:
+          type: integer
+        meanScore:
+          type: number
+        medianScore:
+          type: number
+
+    ScoreBucket:
+      type: object
+      required: [rangeStart, rangeEnd, count]
+      properties:
+        rangeStart:
+          type: number
+        rangeEnd:
+          type: number
+        count:
+          type: integer
+
+    FairnessSummary:
+      type: object
+      required:
+        [
+          coverageRate,
+          matchedCount,
+          unmatchedCount,
+          totalMentees,
+          mentorLoad,
+          priorityBands,
+          scoreDistribution,
+        ]
+      properties:
+        coverageRate:
+          type: number
+          minimum: 0
+          maximum: 1
+        matchedCount:
+          type: integer
+        unmatchedCount:
+          type: integer
+        totalMentees:
+          type: integer
+        mentorLoad:
+          type: array
+          items:
+            $ref: "#/components/schemas/MentorLoad"
+        priorityBands:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriorityBandStat"
+        scoreDistribution:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScoreBucket"
+
+    DraftPair:
+      type: object
+      required: [id, mentee, mentor, score, priorityBand]
+      properties:
+        id:
+          type: string
+          format: uuid
+        mentee:
+          $ref: "#/components/schemas/PersonRef"
+        mentor:
+          $ref: "#/components/schemas/PersonRef"
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        priorityBand:
+          $ref: "#/components/schemas/PriorityBand"
+
+    Run:
+      type: object
+      required: [id, programId, state, progress, createdAt, createdBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        state:
+          $ref: "#/components/schemas/RunState"
+        progress:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: 0 to 1 while queued or running. 1 once drafted.
+        recipeVersion:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        publishedAt:
+          type: [string, "null"]
+          format: date-time
+        publishedBy:
+          type: [string, "null"]
+        draftedCount:
+          type: integer
+        publishedCount:
+          type: integer
+        coverageRate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+
+    RunDetail:
+      allOf:
+        - $ref: "#/components/schemas/Run"
+        - type: object
+          required: [pairs, unmatchedCount]
+          properties:
+            fairnessSummary:
+              oneOf:
+                - $ref: "#/components/schemas/FairnessSummary"
+                - type: "null"
+            pairs:
+              type: array
+              items:
+                $ref: "#/components/schemas/DraftPair"
+            unmatchedCount:
+              type: integer
+
+    RunPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Run"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+
+    StrandMember:
+      type: object
+      required: [participationId, name, role]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        headline:
+          type: [string, "null"]
+        photoUrl:
+          type: [string, "null"]
+          format: uri
+        timezone:
+          type: [string, "null"]
+        skills:
+          type: array
+          items:
+            type: string
+
+    MessagePreview:
+      type: object
+      required: [authorName, body, sentAt]
+      properties:
+        authorName:
+          type: string
+        body:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+
+    StrandSummary:
+      type: object
+      required: [id, programId, state, originMode, members, unreadCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        state:
+          $ref: "#/components/schemas/StrandState"
+        originMode:
+          $ref: "#/components/schemas/OriginMode"
+        members:
+          type: array
+          description: Everyone except the current account.
+          items:
+            $ref: "#/components/schemas/StrandMember"
+        lastMessage:
+          oneOf:
+            - $ref: "#/components/schemas/MessagePreview"
+            - type: "null"
+        lastActivityAt:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            The UI derives the quiet state from this. There is no health enum,
+            because a quiet strand is not an error and must not render as one.
+        unreadCount:
+          type: integer
+        nextSessionAt:
+          type: [string, "null"]
+          format: date-time
+
+    Strand:
+      type: object
+      required: [id, programId, state, originMode, members, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        state:
+          $ref: "#/components/schemas/StrandState"
+        originMode:
+          $ref: "#/components/schemas/OriginMode"
+        members:
+          type: array
+          description: Every member, including the current account.
+          items:
+            $ref: "#/components/schemas/StrandMember"
+        matchRationale:
+          type: [string, "null"]
+          description: |
+            Why these people were put together. A partial explanation, not the
+            explanation: in a global assignment the real reason often involves a
+            third person. Present it as such.
+        createdAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: [string, "null"]
+          format: date-time
+
+    MessageCreate:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 10000
+        clientToken:
+          type: string
+          description: |
+            Echoed back on the created message so an optimistic send can be
+            reconciled against the server row instead of duplicated.
+
+    Message:
+      type: object
+      required: [id, strandId, author, body, sentAt, deliveryState]
+      properties:
+        id:
+          type: string
+          format: uuid
+        strandId:
+          type: string
+          format: uuid
+        author:
+          $ref: "#/components/schemas/PersonRef"
+        body:
+          type: string
+        sentAt:
+          type: string
+          format: date-time
+        deliveryState:
+          type: string
+          enum: [sent, delivered]
+        clientToken:
+          type: [string, "null"]
+
+    MessagePage:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Message"
+        nextCursor:
+          type: [string, "null"]
+          description: Pass as `before` to fetch the previous page. Null when at the start.

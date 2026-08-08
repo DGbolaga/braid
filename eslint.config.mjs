@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated, not authored:
+    "public/mockServiceWorker.js",
+    "lib/api/types.ts",
   ]),
 ]);
 
