@@ -42,8 +42,8 @@ export function ParticipantHeader({
             key={href}
             href={href}
             exact={exact}
-            className="flex min-h-48 items-center border-b-2 px-12 text-body-m transition-colors duration-instant"
-            activeClassName="border-strong font-semibold text-primary"
+            className="flex min-h-48 items-center border-b-2 px-12 type-body-m transition-colors duration-instant"
+            activeClassName="border-strong text-primary"
             idleClassName="border-surface text-secondary hover:text-primary"
           >
             {label}

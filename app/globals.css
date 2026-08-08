@@ -3,11 +3,9 @@
 @import "../styles/tokens.css";
 
 body {
+  @apply type-body-m;
   background: var(--bg-page);
   color: var(--text-primary);
-  font-family: var(--font-ui);
-  font-size: var(--text-body-m);
-  line-height: var(--text-body-m--line-height);
 }
 
 :focus-visible {

@@ -77,6 +77,8 @@
 
   --focus-ring: var(--fuchsia-600);
   --focus-ring-offset: var(--bg-page);
+  /* The 3px halo behind a focused field border, per 8.2. */
+  --focus-ring-halo: var(--fuchsia-50);
 
   --status-success: var(--jade-600);
   --status-warning: var(--marigold-800);
@@ -111,52 +113,15 @@
   --font-display: "Gambetta", Georgia, "Times New Roman", serif;
   --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
 
-  --text-display-xl: 56px;
-  --text-display-xl--line-height: 60px;
-  --text-display-xl--font-weight: 500;
-  --text-display-xl--letter-spacing: -0.02em;
+  /* The eleven type tokens are deliberately not theme entries. A `--text-*`
+     entry generates a utility carrying size, leading, weight and tracking but
+     not family or case, which is precisely the half-right version this system
+     must not allow. They live as `@utility type-*` at the end of this file. */
 
-  --text-display-l: 40px;
-  --text-display-l--line-height: 46px;
-  --text-display-l--font-weight: 500;
-  --text-display-l--letter-spacing: -0.015em;
-
-  --text-heading-l: 28px;
-  --text-heading-l--line-height: 36px;
-  --text-heading-l--font-weight: 600;
-
-  --text-heading-m: 22px;
-  --text-heading-m--line-height: 30px;
-  --text-heading-m--font-weight: 600;
-
-  --text-heading-s: 18px;
-  --text-heading-s--line-height: 26px;
-  --text-heading-s--font-weight: 600;
-
-  --text-body-l: 17px;
-  --text-body-l--line-height: 28px;
-  --text-body-l--font-weight: 400;
-
-  --text-body-m: 15px;
-  --text-body-m--line-height: 24px;
-  --text-body-m--font-weight: 400;
-
-  --text-body-s: 13px;
-  --text-body-s--line-height: 20px;
-  --text-body-s--font-weight: 400;
-
-  --text-label: 13px;
-  --text-label--line-height: 16px;
-  --text-label--font-weight: 600;
-  --text-label--letter-spacing: 0.02em;
-
-  --text-caption: 12px;
-  --text-caption--line-height: 18px;
-  --text-caption--font-weight: 400;
-
-  --text-data-m: 15px;
-  --text-data-m--line-height: 20px;
-  --text-data-m--font-weight: 500;
+  --height-control-sm: 32px;
+  --height-control-md: 40px;
+  --height-control-lg: 48px;
+  --height-field: 44px;
 
   /* Zero is not a spacing step, it is the absence of one. Without it the
      reset below also deletes min-w-0, inset-0, bottom-0 and p-0, which are
@@ -227,6 +192,7 @@
 
   --color-focus: var(--focus-ring);
   --color-focus-offset: var(--focus-ring-offset);
+  --color-focus-halo: var(--focus-ring-halo);
 
   --color-success: var(--status-success);
   --color-warning: var(--status-warning);
@@ -247,4 +213,121 @@
   --dur-base: var(--transition-duration-base);
   --dur-slow: var(--transition-duration-slow);
   --dur-moment: var(--transition-duration-moment);
+}
+
+/* ---------------------------------------------------------------
+   Type. Eleven tokens, each complete: family, size, leading, weight,
+   tracking and case in one class. There is deliberately no way to
+   apply the size without the family, or `label` without its casing.
+   Source: design-direction 5.3.
+   --------------------------------------------------------------- */
+
+@utility type-display-xl {
+  font-family: var(--font-display);
+  font-size: 56px;
+  line-height: 60px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+@utility type-display-l {
+  font-family: var(--font-display);
+  font-size: 40px;
+  line-height: 46px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+@utility type-heading-l {
+  font-family: var(--font-ui);
+  font-size: 28px;
+  line-height: 36px;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+@utility type-heading-m {
+  font-family: var(--font-ui);
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+@utility type-heading-s {
+  font-family: var(--font-ui);
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+@utility type-body-l {
+  font-family: var(--font-ui);
+  font-size: 17px;
+  line-height: 28px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+@utility type-body-m {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 24px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+@utility type-body-s {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 20px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+@utility type-label {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+@utility type-caption {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+@utility type-data-m {
+  font-family: var(--font-data);
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Control sizing. 8.1 pairs heights 40/32/48 with horizontal padding 16/12/20,
+   and 20 is deliberately not on the spacing scale — section 6 allows nothing
+   between the nine steps. Binding the pair here keeps the button on spec
+   without leaking a general-purpose `p-20`. */
+
+@utility control-sm {
+  height: var(--height-control-sm);
+  padding-inline: 12px;
+}
+
+@utility control-md {
+  height: var(--height-control-md);
+  padding-inline: 16px;
+}
+
+@utility control-lg {
+  height: var(--height-control-lg);
+  padding-inline: 20px;
 }

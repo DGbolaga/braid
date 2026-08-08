@@ -33,7 +33,7 @@ export function AdminSidebar({
       <div className="flex items-center justify-between gap-8">
         <span className="flex min-w-0 items-center gap-8">
           <WeaveMark size={32} id="admin-mark" />
-          <span className="truncate text-body-m font-semibold text-primary">
+          <span className="truncate type-heading-s text-primary">
             {current.organisationName}
           </span>
         </span>
@@ -49,7 +49,7 @@ export function AdminSidebar({
       <nav aria-label="Coordinator" className="flex flex-col gap-24">
         {groups.map((group) => (
           <div key={group.label} className="flex flex-col gap-4">
-            <h2 className="px-12 text-label uppercase text-muted">
+            <h2 className="px-12 type-label text-muted">
               {group.label}
             </h2>
             <ul className="flex flex-col">
@@ -58,8 +58,8 @@ export function AdminSidebar({
                   <NavLink
                     href={item.href}
                     exact={item.exact}
-                    className="flex min-h-48 items-center rounded-md border-l-2 px-12 text-body-s transition-colors duration-instant"
-                    activeClassName="border-strong bg-sunken font-semibold text-primary"
+                    className="flex min-h-48 items-center rounded-md border-l-2 px-12 type-body-s transition-colors duration-instant"
+                    activeClassName="border-strong bg-sunken text-primary"
                     idleClassName="border-surface text-secondary hover:bg-sunken hover:text-primary"
                   >
                     {item.label}

@@ -14,7 +14,8 @@ export function WeaveMark({
   size?: number;
   mono?: boolean;
   id?: string;
-  title?: string;
+  /** Pass null where a heading already names the thing, e.g. an empty state. */
+  title?: string | null;
 }) {
   // Below 20px the bars thicken so the weave survives as a favicon (3.1).
   const thickness = size < 20 ? 18 : 16;
@@ -36,8 +37,9 @@ export function WeaveMark({
       viewBox="0 0 140 140"
       width={size}
       height={size}
-      role="img"
-      aria-label={title}
+      {...(title === null
+        ? { "aria-hidden": true as const }
+        : { role: "img", "aria-label": title })}
       style={{ display: "block", overflow: "visible" }}
     >
       <defs>

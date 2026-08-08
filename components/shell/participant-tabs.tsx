@@ -21,9 +21,11 @@ export function ParticipantTabs({
             <NavLink
               href={href}
               exact={exact}
-              className="flex min-h-48 flex-col items-center justify-center gap-4 py-8 text-caption transition-colors duration-instant"
-              activeClassName="font-semibold text-primary"
-              idleClassName="text-muted"
+              // The top rule is the non-colour indicator: colour alone must
+              // never carry the active state (accessibility floor, 11).
+              className="flex min-h-48 flex-col items-center justify-center gap-4 border-t-2 py-8 type-caption transition-colors duration-instant"
+              activeClassName="border-strong text-primary"
+              idleClassName="border-surface text-muted"
             >
               <Icon className="size-24" />
               {label}

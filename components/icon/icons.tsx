@@ -99,3 +99,30 @@ export function SignOutIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** 12px in field errors, per 8.2. Sized by the caller. */
+export function AlertIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 7.75v5" />
+      <path d="M12 16.25h.01" />
+    </Svg>
+  );
+}
+
+/** Sort direction on a table header. Points the way a click would order. */
+export function SortIcon({
+  direction,
+  className,
+}: IconProps & { direction: "asc" | "desc" }) {
+  return (
+    <Svg className={className}>
+      {direction === "asc" ? (
+        <path d="M12 19V5m0 0-5 5m5-5 5 5" />
+      ) : (
+        <path d="M12 5v14m0 0 5-5m-5 5-5-5" />
+      )}
+    </Svg>
+  );
+}

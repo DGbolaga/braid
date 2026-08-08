@@ -271,6 +271,12 @@ Respect `prefers-reduced-motion: reduce` globally. Under it: all durations colla
 
 Only the components that carry the product. Everything else follows from the tokens.
 
+### 8.0 Disabled and loading, shared by every control
+
+**Disabled.** Text `--text-muted`. Controls that normally carry a fill take `--bg-sunken`; bordered controls take `--border-subtle`; text-only controls take neither. Cursor `not-allowed`. No hover response and no press response. Disabled text is exempt from the contrast floor in section 11, because it is not an active control.
+
+**Loading is not disabled.** A loading control keeps its variant colour, because greying it out reads as "you cannot do this" when the truth is "this is happening". It blocks input, preserves its width so nothing reflows, and announces what is in progress to a screen reader. Say what is happening — "Publishing", not "Loading".
+
 ### 8.1 Button
 
 Heights 40 (default), 32 (compact, tables), 48 (primary CTA on mobile). Horizontal padding 16, 12, 20. `--radius-md`.

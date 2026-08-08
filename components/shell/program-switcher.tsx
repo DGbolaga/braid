@@ -27,9 +27,9 @@ export function ProgramSwitcher({
         aria-haspopup="menu"
         // w-full: a button is fit-content by default, so without this it
         // refuses to shrink inside a min-w-0 parent and truncate never fires.
-        className="flex min-h-48 w-full min-w-0 items-center gap-8 rounded-md px-12 text-body-m text-primary transition-colors duration-instant hover:bg-sunken"
+        className="flex min-h-48 w-full min-w-0 items-center gap-8 rounded-md px-12 type-body-m text-primary transition-colors duration-instant hover:bg-sunken"
       >
-        <span className="truncate font-medium">{current.programName}</span>
+        <span className="truncate">{current.programName}</span>
         <ChevronDownIcon className="size-16 shrink-0 text-muted" />
       </button>
 
@@ -55,10 +55,10 @@ export function ProgramSwitcher({
                   className={`size-16 shrink-0 text-primary ${isCurrent ? "" : "invisible"}`}
                 />
                 <span className="flex flex-col">
-                  <span className="text-body-s font-medium text-primary">
+                  <span className="type-body-s text-primary">
                     {programme.programName}
                   </span>
-                  <span className="text-caption text-muted">
+                  <span className="type-caption text-muted">
                     {programme.organisationName} · {programme.role}
                   </span>
                 </span>

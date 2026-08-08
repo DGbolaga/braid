@@ -10,7 +10,7 @@ export function AccountHeader({ session }: { session: Session }) {
       <div className="mx-auto flex max-w-participant items-center gap-16 px-16 py-8">
         <span className="flex shrink-0 items-center gap-8">
           <WeaveMark size={32} id="account-mark" />
-          <span className="text-body-m font-semibold text-primary">Braid</span>
+          <span className="type-heading-s text-primary">Braid</span>
         </span>
         <div className="flex-1" />
         <AvatarMenu account={session.account} />
@@ -27,8 +27,8 @@ export function AccountHeader({ session }: { session: Session }) {
           <NavLink
             key={href}
             href={href}
-            className="flex min-h-48 items-center border-b-2 px-12 text-body-m transition-colors duration-instant"
-            activeClassName="border-strong font-semibold text-primary"
+            className="flex min-h-48 items-center border-b-2 px-12 type-body-m transition-colors duration-instant"
+            activeClassName="border-strong text-primary"
             idleClassName="border-surface text-secondary hover:text-primary"
           >
             {label}

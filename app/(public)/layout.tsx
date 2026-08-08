@@ -10,12 +10,12 @@ export default function PublicLayout({ children }: LayoutProps<"/">) {
       <div className="mx-auto flex w-full max-w-public flex-1 flex-col gap-32 px-16 py-32">
         <span className="flex items-center gap-8">
           <WeaveMark size={32} id="public-mark" />
-          <span className="text-body-m font-semibold text-primary">Braid</span>
+          <span className="type-heading-s text-primary">Braid</span>
         </span>
 
         <main className="flex-1">{children}</main>
 
-        <footer className="border-t border-subtle pt-16 text-caption text-muted">
+        <footer className="border-t border-subtle pt-16 type-caption text-muted">
           Braid
         </footer>
       </div>

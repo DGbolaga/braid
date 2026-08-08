@@ -46,7 +46,7 @@ export function AvatarMenu({ account }: { account: Session["account"] }) {
         <span className="sr-only">Account menu for {account.name}</span>
         <span
           aria-hidden="true"
-          className="flex size-32 items-center justify-center rounded-full bg-inverse text-caption font-medium text-on-inverse"
+          className="flex size-32 items-center justify-center rounded-full bg-inverse type-caption text-on-inverse"
         >
           {initials(account.name)}
         </span>
@@ -61,15 +61,15 @@ export function AvatarMenu({ account }: { account: Session["account"] }) {
           className="absolute right-0 top-full z-10 mt-4 w-max min-w-full rounded-md border border-subtle bg-surface p-4 shadow-raised"
         >
           <div className="border-b border-subtle px-12 py-12">
-            <p className="text-body-s font-medium text-primary">{account.name}</p>
-            <p className="text-caption text-muted">{account.email}</p>
+            <p className="type-body-s text-primary">{account.name}</p>
+            <p className="type-caption text-muted">{account.email}</p>
           </div>
 
           <Link
             role="menuitem"
             href="/settings"
             onClick={() => close(false)}
-            className="flex min-h-48 items-center rounded-sm px-12 text-body-s text-primary transition-colors duration-instant hover:bg-sunken"
+            className="flex min-h-48 items-center rounded-sm px-12 type-body-s text-primary transition-colors duration-instant hover:bg-sunken"
           >
             Settings
           </Link>
@@ -77,7 +77,7 @@ export function AvatarMenu({ account }: { account: Session["account"] }) {
             role="menuitem"
             href="/programs"
             onClick={() => close(false)}
-            className="flex min-h-48 items-center rounded-sm px-12 text-body-s text-primary transition-colors duration-instant hover:bg-sunken"
+            className="flex min-h-48 items-center rounded-sm px-12 type-body-s text-primary transition-colors duration-instant hover:bg-sunken"
           >
             My programmes
           </Link>
@@ -87,14 +87,14 @@ export function AvatarMenu({ account }: { account: Session["account"] }) {
             type="button"
             onClick={() => signOut.mutate()}
             disabled={signOut.isPending}
-            className="flex min-h-48 w-full items-center gap-12 rounded-sm px-12 text-left text-body-s text-primary transition-colors duration-instant hover:bg-sunken"
+            className="flex min-h-48 w-full items-center gap-12 rounded-sm px-12 text-left type-body-s text-primary transition-colors duration-instant hover:bg-sunken"
           >
             <SignOutIcon className="size-16 text-muted" />
             {signOut.isPending ? "Signing out" : "Sign out"}
           </button>
 
           {signOut.isError && (
-            <p role="alert" className="px-12 py-8 text-caption text-danger">
+            <p role="alert" className="px-12 py-8 type-caption text-danger">
               Sign out did not complete.{" "}
               <button
                 type="button"
