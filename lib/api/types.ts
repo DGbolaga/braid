@@ -579,6 +579,13 @@ export interface components {
             unreadCount: number;
             /** Format: date-time */
             nextSessionAt?: string | null;
+            /**
+             * Format: date-time
+             * @description Set when `state` is `ended`. The card names the date, so the
+             *     summary has to carry it rather than making the list fetch each
+             *     strand to find out when it finished.
+             */
+            endedAt?: string | null;
         };
         Strand: {
             /** Format: uuid */

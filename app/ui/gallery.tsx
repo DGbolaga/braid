@@ -5,8 +5,108 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, TextareaField } from "@/components/ui/input";
 import { DataTable, type Column, type SortState } from "@/components/ui/table";
+import {
+  StrandCard,
+  StrandCardError,
+  StrandCardSkeleton,
+} from "@/components/strand/strand-card";
+import type { components } from "@/lib/api/types";
 
 type Person = { id: string; name: string; role: string; load: number; score: number };
+
+type StrandSummary = components["schemas"]["StrandSummary"];
+type StrandMember = components["schemas"]["StrandMember"];
+
+/** Fixed clock, so the quiet and ended lines read the same on every visit. */
+const NOW = new Date("2026-08-08T09:00:00.000Z");
+const shiftDays = (n: number) =>
+  new Date(NOW.getTime() + n * 86_400_000).toISOString();
+
+const participation = (n: number) =>
+  `00000004-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+// 101, 102 and 103 hash to strand colours 1, 2 and 3, so one of each is on
+// screen without the card being told which to use.
+const demoMember = (n: number, name: string, role: "mentor" | "mentee"): StrandMember => ({
+  participationId: participation(n),
+  name,
+  role,
+  headline: null,
+  photoUrl: null,
+  timezone: "Africa/Lagos",
+  skills: [],
+});
+
+const BLESSING = demoMember(101, "Blessing Adewale", "mentee");
+const FATIMA = demoMember(102, "Fatima Yusuf", "mentee");
+const TOBI = demoMember(103, "Tobi Salami", "mentee");
+const GRACE = demoMember(104, "Grace Mwangi", "mentee");
+const AMARA = demoMember(105, "Amara Okonkwo", "mentor");
+
+const strandDemo = (
+  n: number,
+  members: StrandMember[],
+  over: Partial<StrandSummary>,
+): StrandSummary => ({
+  id: `00000008-0000-4000-8000-${String(n).padStart(12, "0")}`,
+  programId: "00000002-0000-4000-8000-000000000001",
+  state: "active",
+  originMode: "batch",
+  members,
+  lastMessage: {
+    authorName: members[0].name,
+    body: "Wrote three tests. One of them caught a bug where I was not handling an empty result.",
+    sentAt: shiftDays(-1),
+  },
+  lastActivityAt: shiftDays(-1),
+  unreadCount: 0,
+  nextSessionAt: null,
+  endedAt: null,
+  ...over,
+});
+
+const UNREAD = strandDemo(1, [BLESSING], {
+  unreadCount: 2,
+  nextSessionAt: shiftDays(4),
+});
+const SESSION = strandDemo(2, [FATIMA], {
+  lastMessage: {
+    authorName: "Amara Okonkwo",
+    body: "Send it over when the first endpoint works end to end.",
+    sentAt: shiftDays(-5),
+  },
+  lastActivityAt: shiftDays(-5),
+  nextSessionAt: shiftDays(11),
+});
+const QUIET = strandDemo(3, [TOBI], {
+  lastMessage: {
+    authorName: "Tobi Salami",
+    body: "Thank you. I will come back with something specific this week.",
+    sentAt: shiftDays(-23),
+  },
+  lastActivityAt: shiftDays(-23),
+});
+const ENDED = strandDemo(4, [GRACE], {
+  state: "ended",
+  lastActivityAt: shiftDays(-40),
+  endedAt: shiftDays(-38),
+});
+const GROUP = strandDemo(5, [BLESSING, FATIMA, TOBI, AMARA], {
+  unreadCount: 12,
+  lastMessage: {
+    authorName: "Fatima Yusuf",
+    body: "I have pushed the branch. Anyone free to look before Thursday?",
+    sentAt: shiftDays(-1),
+  },
+});
+const GROUP_QUIET = strandDemo(6, [BLESSING, FATIMA, AMARA], {
+  lastActivityAt: shiftDays(-57),
+  lastMessage: {
+    authorName: "Amara Okonkwo",
+    body: "Let us pick this up after the break.",
+    sentAt: shiftDays(-57),
+  },
+});
 
 const PEOPLE: Person[] = [
   { id: "p1", name: "Amara Okonkwo", role: "Mentor", load: 3, score: 0.91 },
@@ -188,6 +288,60 @@ export function Gallery() {
         <div className="rounded-md border border-subtle bg-surface">
           <EmptyState markId="es-3" title="No results" body="No one matches those filters." />
         </div>
+      </Section>
+
+      <Section n="08" title="Strand card — one to one">
+        <div className="flex max-w-participant flex-col gap-12">
+          <StrandCard strand={SESSION} href="#" now={NOW} />
+          <StrandCard strand={UNREAD} href="#" now={NOW} />
+          <StrandCard strand={QUIET} href="#" now={NOW} />
+          <StrandCard strand={ENDED} href="#" now={NOW} />
+        </div>
+        <p className="type-caption text-muted">
+          Read down: default with a next session, two unread, quiet for 3 weeks,
+          and ended. The unread card holds a session on 12 August too — 8.3 puts
+          one thing on the right, and the count outranks it until the messages
+          are read.
+        </p>
+      </Section>
+
+      <Section n="09" title="Strand card — group">
+        <div className="flex max-w-participant flex-col gap-12">
+          <StrandCard strand={GROUP} href="#" now={NOW} />
+          <StrandCard strand={GROUP_QUIET} href="#" now={NOW} />
+        </div>
+        <p className="type-caption text-muted">
+          Three avatars at most, overlapping by 12. The chip counts everyone
+          including you, so the preview line is not spent on the count. Group
+          chips are neutral because no single partner owns the colour.
+        </p>
+      </Section>
+
+      <Section n="10" title="Strand card — loading, error, empty">
+        <div className="flex max-w-participant flex-col gap-12">
+          <StrandCardSkeleton />
+          <StrandCardSkeleton />
+          <StrandCardError onRetry={() => undefined} />
+          <div className="rounded-md border border-subtle bg-surface">
+            <EmptyState
+              markId="es-strand"
+              title="No strands yet"
+              body="Matching runs on 14 September. Your strand will appear here the moment it does."
+            />
+          </div>
+        </div>
+      </Section>
+
+      <Section n="11" title="Strand card — narrow, 264px">
+        <div className="flex max-w-sidebar flex-col gap-12">
+          <StrandCard strand={UNREAD} href="#" now={NOW} />
+          <StrandCard strand={GROUP} href="#" now={NOW} />
+          <StrandCard strand={ENDED} href="#" now={NOW} />
+        </div>
+        <p className="type-caption text-muted">
+          Narrower than any real column, so if truncation holds here it holds
+          everywhere. Nothing on the right is pushed out of the card.
+        </p>
       </Section>
     </main>
   );

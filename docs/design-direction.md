@@ -305,9 +305,27 @@ Required fields are marked. Optional fields are not. Whichever is rarer gets the
 
 The most-seen component in the participant shell.
 
-Border, no shadow, `--radius-md`, 16px padding. Avatar 40px, name in `heading-s`, role chip in the partner's strand colour at 12 percent opacity with the 800 stop as text. Last message preview in `body-s` `--text-secondary`, truncated to one line. Right side: unread count as a fuchsia dot with a number, or the next session time in `data-m`.
+Border, no shadow, `--radius-md`, 16px padding. Avatar 40px, name in `heading-s`, role chip in the partner's strand colour at 12 percent opacity with the 800 stop as text. Last message preview in `body-s` `--text-secondary`, truncated to one line. Right side: unread count as a fuchsia pill with a number, or the next session time in `data-m`. One or the other, never both — an unread strand shows its count, and the session waits until the messages have been read.
 
-Quiet state: after 14 days with no activity, a muted line reads "Quiet for 3 weeks." Not red. Not an alert icon. A fact, stated plainly.
+Whole card is the link and one tab stop. Hover darkens the border from `--border-subtle` to `--border-default` over `--dur-instant`. No lift, no shadow.
+
+Quiet state: after 14 days with no activity, a muted line replaces the preview and reads "Quiet for 3 weeks." Not red. Not an alert icon. A fact, stated plainly. Whole weeks, floored, up to eight; past that, whole months.
+
+Ended state: the same muted line, reading "Ended 1 July." The avatar and the chip drop the strand colour for `--bg-sunken` with `--text-secondary`, 7.62:1. No pill, no session.
+
+Group: up to three avatars overlapping by 12, all member names truncated to one line, and a neutral chip reading "Group of 5" that counts the reader too. No single partner owns the colour, so the chip does not take one.
+
+Strand colour is chosen from the partner's participation id, not from their position in the list, so a person is the same colour on every screen and a re-sort does not reshuffle the page.
+
+**The avatar takes the 900 stop, not the 800.** The chip and the avatar are tinted from the same ramp but at different depths, and only the chip's 12 percent tint is light enough to carry 800 text. Measured on `--bg-surface`:
+
+| | fuchsia | marigold | jade |
+|---|---|---|---|
+| chip: 800 on the base at 12% | 6.39:1 | 5.14:1 | 5.30:1 |
+| avatar: 800 on the 100 stop | 5.09:1 | **4.48:1** | **4.26:1** |
+| avatar: 900 on the 100 stop | 8.07:1 | 8.11:1 | 7.65:1 |
+
+Two of the three fail at 800 against the 4.5:1 floor in section 11. Lightening the avatar background instead would pass, but would leave the avatar and the chip nearly the same colour and lose the depth that makes them read as one identity unit. So the background stays at 100 and the initials go to 900. Do not put the 800 values back.
 
 ### 8.4 Data table
 

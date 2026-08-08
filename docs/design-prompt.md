@@ -79,7 +79,8 @@ strand-1 fuchsia-600 | strand-2 marigold-400 | strand-3 jade-600
 
 Hard rules:
 
-- The three strand colours appear in exactly three places: the mark, the match reveal, and participant identity chips. Nowhere else.
+- The three strand colours appear in exactly three places: the mark, the match reveal, and participant identity. Identity means the avatar and the role chip together, on the same person, in the same colour. Nowhere else.
+- A strand colour is chosen from the person's participation id, so it does not change when a list is re-sorted.
 - Marigold never carries white text. Its only text partner is ink.
 - Fuchsia as text on paper uses fuchsia-800. Fuchsia-600 is for fills with white text.
 - Health signals never use red, amber, green. A quiet strand is not an error. Use ink weight plus plain words.
@@ -170,7 +171,7 @@ Every state: default, hover, focus, active, disabled, loading, error, empty.
 
 1. **Button.** Heights 40 default, 32 compact, 48 mobile CTA. Padding 16 / 12 / 20. Primary fuchsia-600 fill with white text. Secondary transparent with border-default. Ghost text only. Danger only inside confirmation dialogs. Focus ring 2px fuchsia-600, 2px offset, never suppressed. Loading replaces the label with a spinner and preserves width.
 2. **Form field.** Label above at 8px gap in the `label` token. Input 44px tall, 12px horizontal padding, radius 6. Focus: fuchsia-600 border plus 3px fuchsia-50 ring. Helper text in caption. Error state with a message that says what to do: "Enter a date after 14 September", never "Invalid input". Mark whichever is rarer, required or optional, not both.
-3. **Strand card.** Border, no shadow, radius 10, 16px padding. 40px avatar, name in heading-s, role chip in the partner's strand colour at 12% opacity with the 800 stop as text. One-line message preview in body-s. Right side: unread count as a fuchsia dot with a number, or next session in data-m. Quiet state after 14 days reads "Quiet for 3 weeks" in muted ink. Not red. Not an alert icon.
+3. **Strand card.** Border, no shadow, radius 10, 16px padding. Whole card is the link. Hover darkens the border to border-default; no lift, no shadow. 40px avatar on the 100 stop of the partner's strand colour with the **900** stop as initials — the 800 stop measures 4.48:1 on marigold and 4.26:1 on jade and must not be used here. Name in heading-s. Role chip in the same colour at 12% opacity with the 800 stop as text, which does pass. One-line message preview in body-s. Right side: unread count as a fuchsia pill with a number, **or** next session in data-m, never both. Quiet state after 14 days replaces the preview with "Quiet for 3 weeks" in muted ink. Not red. Not an alert icon. Ended replaces it with "Ended 1 July" and drops the strand colour for bg-sunken. Group: three avatars overlapping by 12, names truncated to one line, neutral chip reading "Group of 5".
 4. **Data table.** Row height 48. Sticky header in the `label` token on bg-sunken. Cells in body-s. No zebra striping, hairline row borders. Numbers right-aligned in data-m. On bulk select the header row is replaced by an action bar with the count. Filter bar above, row count below.
 5. **Empty state.** Weave mark at 48px in border-default, a display-l line, one sentence of body-m saying what will fill this and when, then one action or none. Never an illustration of a faceless person. Never "Nothing here yet."
 6. **Weave mark** at 16, 32, 48 and 96px, full colour and single colour.

@@ -91,6 +91,31 @@
   --strand-1: var(--fuchsia-600);
   --strand-2: var(--marigold-400);
   --strand-3: var(--jade-600);
+
+  /* The two places a strand colour is allowed to become a surface, per 8.3:
+     the role chip and the avatar. Both are named here rather than mixed at
+     the call site so the ratios below are measured once and cannot drift.
+
+     Chip: the base colour at 12% over the card, with the 800 stop as text —
+     6.39 / 5.14 / 5.30:1.
+
+     Avatar: the 100 stop with the 900 stop as initials — 8.07 / 8.11 / 7.65:1.
+     The 800 stop, which the design file draws, measures 5.09 / 4.48 / 4.26:1
+     and fails on two of the three. See 8.3. */
+  --strand-1-chip-bg: color-mix(in srgb, var(--strand-1) 12%, var(--bg-surface));
+  --strand-1-chip-text: var(--fuchsia-800);
+  --strand-1-avatar-bg: var(--fuchsia-100);
+  --strand-1-avatar-text: var(--fuchsia-900);
+
+  --strand-2-chip-bg: color-mix(in srgb, var(--strand-2) 12%, var(--bg-surface));
+  --strand-2-chip-text: var(--marigold-800);
+  --strand-2-avatar-bg: var(--marigold-100);
+  --strand-2-avatar-text: var(--marigold-900);
+
+  --strand-3-chip-bg: color-mix(in srgb, var(--strand-3) 12%, var(--bg-surface));
+  --strand-3-chip-text: var(--jade-800);
+  --strand-3-avatar-bg: var(--jade-100);
+  --strand-3-avatar-text: var(--jade-900);
 }
 
 /* ---------------------------------------------------------------
@@ -206,6 +231,47 @@
   --color-strand-1: var(--strand-1);
   --color-strand-2: var(--strand-2);
   --color-strand-3: var(--strand-3);
+
+  /* Resolved by the nearest [data-strand] ancestor. `inline` is what makes
+     that work: the utility emits the var reference rather than its value. */
+  --color-strand-chip: var(--strand-chip-bg);
+  --color-strand-chip-text: var(--strand-chip-text);
+  --color-strand-avatar: var(--strand-avatar-bg);
+  --color-strand-avatar-text: var(--strand-avatar-text);
+}
+
+/* Strand identity. The card picks one of three by hashing the partner's
+   participation id, so a person keeps the same colour across screens and
+   across a re-sort. `data-strand` carries the choice; these four variables
+   are what the card actually paints with. */
+
+[data-strand="1"] {
+  --strand-chip-bg: var(--strand-1-chip-bg);
+  --strand-chip-text: var(--strand-1-chip-text);
+  --strand-avatar-bg: var(--strand-1-avatar-bg);
+  --strand-avatar-text: var(--strand-1-avatar-text);
+}
+
+[data-strand="2"] {
+  --strand-chip-bg: var(--strand-2-chip-bg);
+  --strand-chip-text: var(--strand-2-chip-text);
+  --strand-avatar-bg: var(--strand-2-avatar-bg);
+  --strand-avatar-text: var(--strand-2-avatar-text);
+}
+
+[data-strand="3"] {
+  --strand-chip-bg: var(--strand-3-chip-bg);
+  --strand-chip-text: var(--strand-3-chip-text);
+  --strand-avatar-bg: var(--strand-3-avatar-bg);
+  --strand-avatar-text: var(--strand-3-avatar-text);
+}
+
+/* An ended strand drops its colour. Neutral, and still 7.62:1. */
+[data-strand="none"] {
+  --strand-chip-bg: var(--bg-sunken);
+  --strand-chip-text: var(--text-secondary);
+  --strand-avatar-bg: var(--bg-sunken);
+  --strand-avatar-text: var(--text-secondary);
 }
 
 /* Duration names as written in the design direction. Tailwind owns the
@@ -334,4 +400,21 @@
 @utility control-lg {
   height: var(--height-control-lg);
   padding-inline: 20px;
+}
+
+/* Two fixed sizes from 8.3 that are sizes rather than spacing, so section 6's
+   nine steps do not cover them. Bound here for the same reason as the control
+   heights: the component gets the drawn size without an arbitrary class. */
+
+@utility avatar {
+  width: 40px;
+  height: 40px;
+  flex: none;
+}
+
+@utility badge-count {
+  min-width: 20px;
+  height: 20px;
+  padding-inline: 4px;
+  flex: none;
 }

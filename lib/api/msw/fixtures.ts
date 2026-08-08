@@ -227,6 +227,9 @@ type StrandSeed = {
   lastActivityDaysAgo: number;
   unread: number;
   nextSessionInDays: number | null;
+  /** Omitted means active. An ended strand needs `endedDaysAgo` with it. */
+  state?: S["StrandState"];
+  endedDaysAgo?: number;
   messages: Array<[fromMe: boolean, daysAgo: number, body: string]>;
 };
 
@@ -273,6 +276,23 @@ const STRAND_SEEDS: StrandSeed[] = [
       [false, 23, "Thank you. I will come back with something specific this week."],
     ],
   },
+  {
+    n: 4,
+    menteeIdx: 4,
+    lastActivityDaysAgo: 40,
+    unread: 0,
+    nextSessionInDays: null,
+    state: "ended",
+    endedDaysAgo: 38,
+    messages: [
+      [true, 70, "Hello Grace. You said Java and system design. Which of the two is closer to what you need this month?"],
+      [false, 68, "System design. I can write Java but I freeze when someone asks me how I would build something."],
+      [true, 60, "Then we will draw. Every session, one system on paper before any code."],
+      [false, 44, "Drew the ticketing one on my own this week and it held together."],
+      [true, 41, "That is the cohort finished. You came in unable to start a diagram and you are now finishing them unprompted. Keep drawing."],
+      [false, 40, "Thank you Amara. I will."],
+    ],
+  },
 ];
 
 function buildStrands() {
@@ -309,23 +329,25 @@ function buildStrands() {
 
     messages[id] = thread;
     const last = thread[thread.length - 1];
+    const state = seed.state ?? "active";
+    const endedAt =
+      seed.endedDaysAgo === undefined ? null : daysAgo(seed.endedDaysAgo);
 
     strands.push({
       id,
       programId: PROGRAM,
-      state: "active",
+      state,
       originMode: "batch",
       members: [meMember, partner],
-      matchRationale:
-        "Matched on a shared focus in Python and backend fundamentals, with a two-hour timezone overlap. This names the strongest signals; in a whole-cohort assignment the outcome also depends on who else was available.",
-      createdAt: daysAgo(28),
-      endedAt: null,
+      matchRationale: `Matched on a shared focus in ${menteeSkills(seed.menteeIdx)[0]} and backend fundamentals, with a two-hour timezone overlap. This names the strongest signals; in a whole-cohort assignment the outcome also depends on who else was available.`,
+      createdAt: daysAgo(Math.max(...seed.messages.map(([, ago]) => ago)) + 2),
+      endedAt,
     });
 
     summaries.push({
       id,
       programId: PROGRAM,
-      state: "active",
+      state,
       originMode: "batch",
       members: [partner],
       lastMessage: {
@@ -339,6 +361,7 @@ function buildStrands() {
         seed.nextSessionInDays === null
           ? null
           : daysAhead(seed.nextSessionInDays),
+      endedAt,
     });
   }
 
