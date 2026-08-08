@@ -1,0 +1,244 @@
+/* Braid design tokens. Source: docs/design-direction.md sections 4-7.
+   This is the only file in the codebase permitted to contain a raw colour. */
+
+/* ---------------------------------------------------------------
+   Ramps
+   --------------------------------------------------------------- */
+
+:root {
+  --ink-50: #f4f1f7;
+  --ink-100: #ddd5e4;
+  --ink-200: #b9aac6;
+  --ink-400: #6b5580;
+  --ink-600: #402c57;
+  --ink-800: #241733;
+  --ink-900: #150c1f;
+
+  --fuchsia-50: #fdebf2;
+  --fuchsia-100: #f9c4da;
+  --fuchsia-200: #f296b8;
+  --fuchsia-400: #e4548e;
+  --fuchsia-600: #d6246e;
+  --fuchsia-800: #a11550;
+  --fuchsia-900: #6b0c34;
+
+  --marigold-50: #fff6e3;
+  --marigold-100: #ffe5ac;
+  --marigold-200: #ffd26f;
+  --marigold-400: #ffb627;
+  --marigold-600: #c88709;
+  --marigold-800: #8f5f04;
+  --marigold-900: #5c3c02;
+
+  --jade-50: #e6f7f1;
+  --jade-100: #a9e5d0;
+  --jade-200: #6dd1b0;
+  --jade-400: #1cbb90;
+  --jade-600: #0fa37f;
+  --jade-800: #0a7059;
+  --jade-900: #054636;
+
+  --warm-50: #fffcf7;
+  --warm-100: #f7f1e9;
+  --warm-200: #e8dfd6;
+  --warm-400: #c4b7aa;
+  --warm-600: #8a7a6c;
+  --warm-800: #574a3f;
+  --warm-900: #33291f;
+
+  --white: #ffffff;
+  --danger-base: #c42b1c;
+}
+
+/* ---------------------------------------------------------------
+   Semantic tokens. Components reference these names, never a ramp.
+   Dark mode later reassigns this layer and nothing else.
+   --------------------------------------------------------------- */
+
+:root {
+  --bg-page: var(--warm-50);
+  --bg-surface: var(--white);
+  --bg-sunken: var(--warm-100);
+  --bg-inverse: var(--ink-800);
+
+  --text-primary: var(--ink-800);
+  --text-secondary: var(--warm-800);
+  --text-muted: var(--warm-600);
+  --text-inverse: var(--warm-50);
+  --text-link: var(--fuchsia-800);
+
+  --border-subtle: var(--warm-200);
+  --border-default: var(--warm-400);
+  --border-strong: var(--ink-400);
+
+  --action-primary-bg: var(--fuchsia-600);
+  --action-primary-fg: var(--white);
+  --action-primary-hover: var(--fuchsia-800);
+
+  --focus-ring: var(--fuchsia-600);
+  --focus-ring-offset: var(--bg-page);
+
+  --status-success: var(--jade-600);
+  --status-warning: var(--marigold-800);
+  --status-danger: var(--danger-base);
+  --status-info: var(--ink-600);
+
+  --strand-1: var(--fuchsia-600);
+  --strand-2: var(--marigold-400);
+  --strand-3: var(--jade-600);
+}
+
+/* ---------------------------------------------------------------
+   Tailwind theme. The `initial` resets delete Tailwind's stock
+   palette, type scale, shadows, radii and spacing so the only
+   values reachable from a utility class are the ones below.
+   --------------------------------------------------------------- */
+
+@theme {
+  --color-*: initial;
+  --font-*: initial;
+  --text-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --ease-*: initial;
+  --spacing: initial;
+  --spacing-*: initial;
+  --container-*: initial;
+
+  --font-ui: "Switzer", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Gambetta", Georgia, "Times New Roman", serif;
+  --font-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --text-display-xl: 56px;
+  --text-display-xl--line-height: 60px;
+  --text-display-xl--font-weight: 500;
+  --text-display-xl--letter-spacing: -0.02em;
+
+  --text-display-l: 40px;
+  --text-display-l--line-height: 46px;
+  --text-display-l--font-weight: 500;
+  --text-display-l--letter-spacing: -0.015em;
+
+  --text-heading-l: 28px;
+  --text-heading-l--line-height: 36px;
+  --text-heading-l--font-weight: 600;
+
+  --text-heading-m: 22px;
+  --text-heading-m--line-height: 30px;
+  --text-heading-m--font-weight: 600;
+
+  --text-heading-s: 18px;
+  --text-heading-s--line-height: 26px;
+  --text-heading-s--font-weight: 600;
+
+  --text-body-l: 17px;
+  --text-body-l--line-height: 28px;
+  --text-body-l--font-weight: 400;
+
+  --text-body-m: 15px;
+  --text-body-m--line-height: 24px;
+  --text-body-m--font-weight: 400;
+
+  --text-body-s: 13px;
+  --text-body-s--line-height: 20px;
+  --text-body-s--font-weight: 400;
+
+  --text-label: 13px;
+  --text-label--line-height: 16px;
+  --text-label--font-weight: 600;
+  --text-label--letter-spacing: 0.02em;
+
+  --text-caption: 12px;
+  --text-caption--line-height: 18px;
+  --text-caption--font-weight: 400;
+
+  --text-data-m: 15px;
+  --text-data-m--line-height: 20px;
+  --text-data-m--font-weight: 500;
+
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-48: 48px;
+  --spacing-64: 64px;
+  --spacing-96: 96px;
+
+  --container-public: 720px;
+  --container-participant: 900px;
+  --container-coordinator: 1200px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+
+  --shadow-raised: 0 1px 2px rgb(36 23 51 / 0.06), 0 4px 12px rgb(36 23 51 / 0.04);
+  --shadow-overlay: 0 8px 32px rgb(36 23 51 / 0.12);
+
+  --transition-duration-instant: 90ms;
+  --transition-duration-quick: 160ms;
+  --transition-duration-base: 240ms;
+  --transition-duration-slow: 420ms;
+  --transition-duration-moment: 1400ms;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.64, 0, 0.78, 0);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-weave: cubic-bezier(0.34, 0.9, 0.28, 1);
+
+  --default-transition-duration: var(--transition-duration-quick);
+  --default-transition-timing-function: var(--ease-out);
+}
+
+/* `inline` keeps the utility pointing at the semantic variable rather
+   than copying its value, so reassigning the layer above re-themes
+   every utility at once. */
+
+@theme inline {
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-sunken: var(--bg-sunken);
+  --color-inverse: var(--bg-inverse);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-on-inverse: var(--text-inverse);
+  --color-link: var(--text-link);
+
+  --color-subtle: var(--border-subtle);
+  --color-default: var(--border-default);
+  --color-strong: var(--border-strong);
+
+  --color-accent: var(--action-primary-bg);
+  --color-on-accent: var(--action-primary-fg);
+  --color-accent-hover: var(--action-primary-hover);
+
+  --color-focus: var(--focus-ring);
+  --color-focus-offset: var(--focus-ring-offset);
+
+  --color-success: var(--status-success);
+  --color-warning: var(--status-warning);
+  --color-danger: var(--status-danger);
+  --color-info: var(--status-info);
+
+  --color-strand-1: var(--strand-1);
+  --color-strand-2: var(--strand-2);
+  --color-strand-3: var(--strand-3);
+}
+
+/* Duration names as written in the design direction. Tailwind owns the
+   `--transition-duration-*` namespace that generates `duration-quick`. */
+
+:root {
+  --dur-instant: var(--transition-duration-instant);
+  --dur-quick: var(--transition-duration-quick);
+  --dur-base: var(--transition-duration-base);
+  --dur-slow: var(--transition-duration-slow);
+  --dur-moment: var(--transition-duration-moment);
+}
