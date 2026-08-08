@@ -119,6 +119,17 @@ export const handlers = [
     });
   }),
 
+  http.post(url("/auth/signout"), () => {
+    db.signedIn = false;
+    return new HttpResponse(null, {
+      status: 204,
+      headers: {
+        "Set-Cookie":
+          "braid_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
+      },
+    });
+  }),
+
   http.get(url("/auth/session"), () => {
     return db.signedIn ? HttpResponse.json(db.session) : unauthorized();
   }),

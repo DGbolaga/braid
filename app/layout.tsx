@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MswProvider } from "@/lib/api/msw/provider";
+import { Providers } from "./providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <MswProvider>{children}</MswProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

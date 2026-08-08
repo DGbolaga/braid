@@ -28,15 +28,20 @@ Do not add a dependency without asking first. Do not add a global state library.
 ```
 app/
   (public)/          landing, apply, signin, verify, invite
-  (participant)/     home, strands, directory, profile, settings
+  (account)/         settings, programs — account scope, no program in the URL
+  (participant)/     home, strands, directory, resources, profile
   (admin)/           dashboard, form builder, roster, runs, reports
   layout.tsx
 components/
   ui/                button, input, table, empty-state, dialog
+  shell/             headers, sidebar, nav, program switcher, avatar menu
+  brand/             weave mark
+  icon/              inline svgs
   strand/            strand card, strand panel, match reveal
   form/              dynamic form renderer, field types
 lib/
   api/               generated types, typed client, msw handlers
+  auth/              session and role guard
   tokens.ts          typed access to CSS variables where JS needs them
 styles/
   tokens.css         every design token, single source of truth
@@ -89,7 +94,9 @@ Do not skip ahead.
 
 1. `tokens.css`, Tailwind theme mapping, fonts self-hosted and preloaded
 2. `openapi.yaml` for the slice, generated types, MSW handlers
-3. Three shells: route groups, layouts, navigation
+3. Four shells: route groups, layouts, navigation. `(account)` is separate
+   because `/settings` and `/programs` carry no org or program in the URL and
+   so cannot inherit the participant layout's guard.
 4. `ui/` primitives: button, form field, data table, empty state
 5. Strand card
 6. Dynamic form renderer

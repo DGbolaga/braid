@@ -458,6 +458,20 @@ export function createDb() {
         status: "approved",
         isCoordinator: true,
       },
+      // Role lives on the participation, never the account: the same person is
+      // a mentor here and a mentee elsewhere. Only the programme switcher and
+      // the guards read this one — it has no roster, runs or strands behind it.
+      {
+        id: participation(900),
+        programId: uuid(2, 2),
+        programName: "Research writing, 2026",
+        organisationName: "University of Lagos",
+        orgSlug: "unilag",
+        programSlug: "research-writing-2026",
+        role: "mentee",
+        status: "approved",
+        isCoordinator: false,
+      },
     ],
   };
 

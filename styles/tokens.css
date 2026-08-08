@@ -158,6 +158,10 @@
   --text-data-m--line-height: 20px;
   --text-data-m--font-weight: 500;
 
+  /* Zero is not a spacing step, it is the absence of one. Without it the
+     reset below also deletes min-w-0, inset-0, bottom-0 and p-0, which are
+     structural rather than design decisions. */
+  --spacing-0: 0px;
   --spacing-4: 4px;
   --spacing-8: 8px;
   --spacing-12: 12px;
@@ -171,6 +175,8 @@
   --container-public: 720px;
   --container-participant: 900px;
   --container-coordinator: 1200px;
+  /* Not in the design direction, which gives content widths but no sidebar. */
+  --container-sidebar: 264px;
 
   --radius-sm: 6px;
   --radius-md: 10px;

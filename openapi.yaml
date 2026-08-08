@@ -180,6 +180,22 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+  /auth/signout:
+    post:
+      operationId: signOut
+      tags: [Auth]
+      summary: End the current session
+      description: Clears the session cookie. Safe to call without a session.
+      security: []
+      responses:
+        "204":
+          description: Signed out
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+              example: braid_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0
+
   /auth/session:
     get:
       operationId: getSession
