@@ -87,7 +87,7 @@ ink       50 #F4F1F7   100 #DDD5E4   200 #B9AAC6   400 #6B5580   600 #402C57   8
 fuchsia   50 #FDEBF2   100 #F9C4DA   200 #F296B8   400 #E4548E   600 #D6246E   800 #A11550   900 #6B0C34
 marigold  50 #FFF6E3   100 #FFE5AC   200 #FFD26F   400 #FFB627   600 #C88709   800 #8F5F04   900 #5C3C02
 jade      50 #E6F7F1   100 #A9E5D0   200 #6DD1B0   400 #1CBB90   600 #0FA37F   800 #0A7059   900 #054636
-warm      50 #FFFCF7   100 #F7F1E9   200 #E8DFD6   400 #C4B7AA   600 #8A7A6C   800 #574A3F   900 #33291F
+warm      50 #FFFCF7   100 #F7F1E9   200 #E8DFD6   400 #948A81   600 #7B6C60   800 #574A3F   900 #33291F
 ```
 
 ### 4.3 Semantic tokens
@@ -118,6 +118,7 @@ The engineer never writes a brand hex in a component. Components consume semanti
 --focus-ring-offset   bg-page
 
 --status-success      jade-600
+--status-success-text jade-800
 --status-warning      marigold-800
 --status-danger       #C42B1C
 --status-info         ink-600
@@ -132,6 +133,8 @@ The engineer never writes a brand hex in a component. Components consume semanti
 - **The three strand colours appear in exactly three places:** the mark, the match reveal, and participant identity chips. Nowhere else. This is what keeps them meaningful.
 - **Marigold never carries white text.** Its only text partner is ink. This is non-negotiable and it is why marigold is an emphasis colour, not an action colour.
 - **Fuchsia at 600 carries white text and passes AA at normal size.** For fuchsia _as_ text on paper, use fuchsia-800.
+- **Jade at 600 is a fill, not text, and it never carries white.** On paper it measures 3.20:1, and white on it measures 3.20:1 — both fail AA. Jade-600 takes ink text (5.27:1), exactly as marigold does. For jade _as_ text, use jade-800 via `--status-success-text` (6.04:1 on paper). A jade fill that must carry white text uses jade-800 (6.04:1). `--strand-3` stays at 600, because it is a fill.
+- **Warm-400 and warm-600 are set by contrast, not by taste.** `--border-default` bounds interactive controls and must clear 3:1; `--text-muted` carries helper text at 12px and must clear 4.5:1. `--border-subtle` is a decorative hairline on cards and dividers, carries no meaning alone, and is deliberately left light.
 - **Health signals do not use red, amber, green.** A quiet strand is not an error, and a coordinator reading a wall of red will stop reading. Use ink weight and a small textual state instead: bold ink for needs attention, muted for fine.
 - **One accent per screen.** If a page has a primary action, nothing else on it is fuchsia.
 

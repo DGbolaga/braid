@@ -41,8 +41,8 @@
   --warm-50: #fffcf7;
   --warm-100: #f7f1e9;
   --warm-200: #e8dfd6;
-  --warm-400: #c4b7aa;
-  --warm-600: #8a7a6c;
+  --warm-400: #948a81;
+  --warm-600: #7b6c60;
   --warm-800: #574a3f;
   --warm-900: #33291f;
 
@@ -81,6 +81,9 @@
   --focus-ring-halo: var(--fuchsia-50);
 
   --status-success: var(--jade-600);
+  /* Jade 600 is a fill. As text it measures 3.20:1, so text takes 800 —
+     the same split fuchsia already uses. */
+  --status-success-text: var(--jade-800);
   --status-warning: var(--marigold-800);
   --status-danger: var(--danger-base);
   --status-info: var(--ink-600);
@@ -195,6 +198,7 @@
   --color-focus-halo: var(--focus-ring-halo);
 
   --color-success: var(--status-success);
+  --color-success-text: var(--status-success-text);
   --color-warning: var(--status-warning);
   --color-danger: var(--status-danger);
   --color-info: var(--status-info);

@@ -62,7 +62,7 @@ ink       50 #F4F1F7  100 #DDD5E4  200 #B9AAC6  400 #6B5580  600 #402C57  800 #2
 fuchsia   50 #FDEBF2  100 #F9C4DA  200 #F296B8  400 #E4548E  600 #D6246E  800 #A11550  900 #6B0C34
 marigold  50 #FFF6E3  100 #FFE5AC  200 #FFD26F  400 #FFB627  600 #C88709  800 #8F5F04  900 #5C3C02
 jade      50 #E6F7F1  100 #A9E5D0  200 #6DD1B0  400 #1CBB90  600 #0FA37F  800 #0A7059  900 #054636
-warm      50 #FFFCF7  100 #F7F1E9  200 #E8DFD6  400 #C4B7AA  600 #8A7A6C  800 #574A3F  900 #33291F
+warm      50 #FFFCF7  100 #F7F1E9  200 #E8DFD6  400 #948A81  600 #7B6C60  800 #574A3F  900 #33291F
 ```
 
 Semantic mapping. Components reference these names, never raw hex:
@@ -73,7 +73,7 @@ text-primary ink-800 | text-secondary warm-800 | text-muted warm-600 | text-inve
 border-subtle warm-200 | border-default warm-400 | border-strong ink-400
 action-primary-bg fuchsia-600 | action-primary-fg #FFFFFF | action-primary-hover fuchsia-800
 focus-ring fuchsia-600
-status-success jade-600 | status-warning marigold-800 | status-danger #C42B1C | status-info ink-600
+status-success jade-600 | status-success-text jade-800 | status-warning marigold-800 | status-danger #C42B1C | status-info ink-600
 strand-1 fuchsia-600 | strand-2 marigold-400 | strand-3 jade-600
 ```
 
