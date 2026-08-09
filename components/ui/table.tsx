@@ -74,7 +74,7 @@ function Checkbox({
       <span
         aria-hidden="true"
         className={[
-          "flex size-16 items-center justify-center rounded-sm border",
+          "flex size-16 items-center justify-center rounded-xs border",
           "transition-colors duration-instant",
           "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus",
           checked || indeterminate

@@ -202,7 +202,9 @@ Base 16px, ratio 1.25, rounded to whole pixels.
 
 **Grid.** 12 columns, 24px gutter, 1200px max for the coordinator shell, 900px for the participant shell, 720px for public pages. Below 768px everything is a single column with 16px margins.
 
-**Radius.** `--radius-sm` 6px for inputs and chips, `--radius-md` 10px for cards and buttons, `--radius-lg` 16px for modals and the strand panel. The mark's bars are fully rounded and that is the only fully rounded shape in the system apart from avatars.
+**Radius.** `--radius-xs` 3px for controls under 24px, `--radius-sm` 6px for inputs and chips, `--radius-md` 10px for cards and buttons, `--radius-lg` 16px for modals and the strand panel. The mark's bars are fully rounded and that is the only fully rounded shape in the system apart from avatars.
+
+`--radius-xs` exists for one reason: a checkbox is 16px, and 6px on a 16px box is 37 percent of the width, which reads as a circle. Shape is what separates a checkbox from a radio before either is clicked — the tick and the dot only arrive afterwards — so the smaller box needs the smaller radius. Do not reach for it above 24px. Anything larger is an input and takes 6px.
 
 **Borders.** 1px, `--border-subtle` by default. The interface is defined by hairlines and space, not by shadows.
 

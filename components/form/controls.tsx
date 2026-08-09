@@ -35,7 +35,7 @@ function Box({
       <input
         {...input}
         type={kind}
-        className={`${BOX} ${kind === "radio" ? "rounded-full" : "rounded-sm"}`}
+        className={`${BOX} ${kind === "radio" ? "rounded-full" : "rounded-xs"}`}
       />
       {kind === "radio" ? (
         <span

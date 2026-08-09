@@ -171,6 +171,10 @@
   /* Not in the design direction, which gives content widths but no sidebar. */
   --container-sidebar: 264px;
 
+  /* Controls under 24px only. At 16px a 6px radius is 37 percent of the box
+     and a checkbox stops reading as a square, which is the only thing telling
+     it apart from a radio before either is clicked. */
+  --radius-xs: 3px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;

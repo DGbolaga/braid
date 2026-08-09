@@ -121,7 +121,8 @@ Never more than three sizes in one view. Body copy caps at 68 characters per lin
 
 - Space scale, 4px base: 4, 8, 12, 16, 24, 32, 48, 64, 96. Nothing between.
 - Grid: 12 columns, 24px gutter. Max width 1200 coordinator, 900 participant, 720 public. Below 768px, single column, 16px margins.
-- Radius: 6px inputs and chips, 10px cards and buttons, 16px modals and the strand panel. Fully rounded only for the mark's bars and avatars.
+- Radius: 3px controls under 24px, 6px inputs and chips, 10px cards and buttons, 16px modals and the strand panel. Fully rounded only for the mark's bars and avatars.
+- The 3px step is for checkboxes and nothing else reaches for it. At 16px a 6px radius reads as a circle, and shape is what separates a checkbox from a radio before either is clicked.
 - Borders: 1px, border-subtle by default. The interface is defined by hairlines and space.
 - Depth, two levels only. Raised: `0 1px 2px rgba(36,23,51,0.06), 0 4px 12px rgba(36,23,51,0.04)` for dropdowns, popovers, toasts. Overlay: `0 8px 32px rgba(36,23,51,0.12)` for modals.
 - **Cards have a border, never a shadow.** A page of shadowed cards looks like a template.
