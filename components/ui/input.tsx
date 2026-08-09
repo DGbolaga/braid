@@ -16,7 +16,7 @@ import { AlertIcon } from "@/components/icon/icons";
  * "Required fields are marked. Optional fields are not. Whichever is rarer
  * gets the mark." Which is rarer is a per-form decision, so `mark` inverts it.
  */
-type FieldOwnProps = {
+export type FieldOwnProps = {
   label: string;
   helper?: string;
   /** Say what went wrong and how to fix it: "Enter a date after 14 September". */
@@ -25,9 +25,15 @@ type FieldOwnProps = {
   mark?: "required" | "optional" | "none";
 };
 
-const controlClasses = (invalid: boolean) =>
+/**
+ * `typography` is a parameter rather than something a caller appends via
+ * className: two type utilities on one element resolve by stylesheet order, not
+ * by the order they are written, so a `type-data-m` passed in from outside
+ * would silently lose to the `type-body-m` in here.
+ */
+export const controlClasses = (invalid: boolean, typography = "type-body-m") =>
   [
-    "w-full rounded-sm border bg-surface px-12 type-body-m text-primary",
+    `w-full rounded-sm border bg-surface px-12 text-primary ${typography}`,
     "transition-[border-color,box-shadow] duration-instant ease-out",
     "placeholder:text-muted",
     "focus:outline-none focus:ring-3 focus:ring-focus-halo",
@@ -37,35 +43,23 @@ const controlClasses = (invalid: boolean) =>
     "disabled:cursor-not-allowed disabled:border-subtle disabled:bg-sunken disabled:text-muted",
   ].join(" ");
 
-function FieldShell({
-  label,
+function Mark({ mark = "required", required }: Pick<FieldOwnProps, "mark" | "required">) {
+  if (mark === "required" && required) return <span className="text-muted">Required</span>;
+  if (mark === "optional" && !required) return <span className="text-muted">Optional</span>;
+  return null;
+}
+
+function Support({
   helper,
   error,
-  required,
-  mark = "required",
-  controlId,
   helperId,
   errorId,
-  children,
-}: FieldOwnProps & {
-  controlId: string;
+}: Pick<FieldOwnProps, "helper" | "error"> & {
   helperId: string;
   errorId: string;
-  children: React.ReactNode;
 }) {
-  const showRequired = mark === "required" && required;
-  const showOptional = mark === "optional" && !required;
-
   return (
-    <div className="flex flex-col gap-8">
-      <label htmlFor={controlId} className="flex items-center gap-8 type-label text-primary">
-        {label}
-        {showRequired && <span className="text-muted">Required</span>}
-        {showOptional && <span className="text-muted">Optional</span>}
-      </label>
-
-      {children}
-
+    <>
       {helper && !error && (
         <p id={helperId} className="type-caption text-muted">
           {helper}
@@ -82,12 +76,87 @@ function FieldShell({
           {error}
         </p>
       )}
+    </>
+  );
+}
+
+function FieldShell({
+  label,
+  helper,
+  error,
+  required,
+  mark,
+  controlId,
+  helperId,
+  errorId,
+  children,
+}: FieldOwnProps & {
+  controlId: string;
+  helperId: string;
+  errorId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-8">
+      <label htmlFor={controlId} className="flex items-center gap-8 type-label text-primary">
+        {label}
+        <Mark mark={mark} required={required} />
+      </label>
+
+      {children}
+
+      <Support helper={helper} error={error} helperId={helperId} errorId={errorId} />
     </div>
   );
 }
 
+/**
+ * The same furniture for a group of controls. A radio group, a checkbox group
+ * and a scale have no single element for a `<label>` to point at, so the group
+ * gets a `<fieldset>` and a `<legend>`. Reusing FieldShell here would attach
+ * the label to nothing.
+ */
+export function FieldsetShell({
+  label,
+  helper,
+  error,
+  required,
+  mark,
+  helperId,
+  errorId,
+  children,
+}: FieldOwnProps & {
+  helperId: string;
+  errorId: string;
+  children: React.ReactNode;
+}) {
+  return (
+    // A legend does not take part in its fieldset's flex layout, so the gap
+    // comes from its own margin and the controls get their own flex container.
+    <fieldset
+      className="min-w-0"
+      aria-required={required || undefined}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={error ? errorId : helper ? helperId : undefined}
+    >
+      <legend className="mb-8 flex items-center gap-8 type-label text-primary">
+        {label}
+        <Mark mark={mark} required={required} />
+      </legend>
+
+      <div className="flex flex-col gap-8">
+        {children}
+        <Support helper={helper} error={error} helperId={helperId} errorId={errorId} />
+      </div>
+    </fieldset>
+  );
+}
+
 export type FieldProps = FieldOwnProps &
-  Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "required">;
+  Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "required"> & {
+    /** Numbers and dates set in the mono face, per section 5.3. */
+    numeric?: boolean;
+  };
 
 export function Field({
   label,
@@ -95,6 +164,7 @@ export function Field({
   error,
   required,
   mark,
+  numeric = false,
   className = "",
   ...rest
 }: FieldProps) {
@@ -121,7 +191,7 @@ export function Field({
         aria-required={required || undefined}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : helper ? helperId : undefined}
-        className={`h-field ${controlClasses(Boolean(error))} ${className}`}
+        className={`h-field ${controlClasses(Boolean(error), numeric ? "type-data-m" : "type-body-m")} ${className}`}
       />
     </FieldShell>
   );

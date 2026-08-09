@@ -11,6 +11,10 @@ import {
   StrandCardSkeleton,
 } from "@/components/strand/strand-card";
 import type { components } from "@/lib/api/types";
+import { FormRenderer } from "@/components/form/form-renderer";
+import { FORM_VERSIONS } from "@/lib/api/msw/fixtures";
+import { visibleFieldIds, type FormValues } from "@/lib/form/conditions";
+import { toJsonSchema } from "@/lib/form/json-schema";
 
 type Person = { id: string; name: string; role: string; load: number; score: number };
 
@@ -149,7 +153,10 @@ export function Gallery() {
   const [selectedDemo, setSelectedDemo] = useState<string[]>(["p1", "p2"]);
 
   return (
-    <main className="mx-auto flex max-w-coordinator flex-col gap-64 bg-page px-32 py-48">
+    // `w-full` is load-bearing: an auto inline margin on a flex item overrides
+    // stretch, so without it this sizes to max-content and the page scrolls
+    // sideways on anything narrower than the widest section.
+    <main className="mx-auto flex w-full max-w-coordinator flex-col gap-64 bg-page px-32 py-48">
       <header className="flex flex-col gap-4">
         <span className="type-label text-muted">Development only</span>
         <h1 className="type-heading-l text-primary">ui/ primitives, every state</h1>
@@ -343,6 +350,73 @@ export function Gallery() {
           everywhere. Nothing on the right is pushed out of the card.
         </p>
       </Section>
+
+      <Section n="12" title="Dynamic form renderer">
+        <p className="max-w-public type-body-m text-secondary">
+          The published mentee form for this programme, rendered from the schema
+          with no page-level knowledge of any question. Answer &ldquo;No&rdquo;
+          to &ldquo;Have you been mentored before?&rdquo; and a follow-up
+          appears, carrying its own required rule with it. Submit while it is
+          hidden and that rule does not fire.
+        </p>
+        <FormPlayground />
+      </Section>
     </main>
+  );
+}
+
+const MENTEE_FORM = FORM_VERSIONS[0];
+
+function FormPlayground() {
+  const [values, setValues] = useState<FormValues>({});
+  const [payload, setPayload] = useState<string | null>(null);
+
+  const visible = visibleFieldIds(MENTEE_FORM, values);
+  const jsonSchema = toJsonSchema(MENTEE_FORM, visible);
+
+  return (
+    <div className="grid gap-32 lg:grid-cols-2">
+      <div className="max-w-public">
+        <FormRenderer
+          version={MENTEE_FORM}
+          submitLabel="Send"
+          onValuesChange={setValues}
+          onSubmit={(answers) => setPayload(JSON.stringify(answers, null, 2))}
+        />
+      </div>
+
+      <div className="flex min-w-0 flex-col gap-24 lg:sticky lg:top-32 lg:self-start">
+        <Panel
+          title="Generated JSON Schema"
+          note={`${visible.size} of ${MENTEE_FORM.sections.flatMap((s) => s.fields).length} fields on screen. Derived from the same generator the browser validates with, so the two cannot drift.`}
+          body={JSON.stringify(jsonSchema, null, 2)}
+        />
+        <Panel
+          title="Submitted payload"
+          note="Hidden fields and the file field are absent, not null. Local state keeps them, so toggling an answer back does not lose what was typed."
+          body={payload ?? "Nothing sent yet."}
+        />
+      </div>
+    </div>
+  );
+}
+
+function Panel({
+  title,
+  note,
+  body,
+}: {
+  title: string;
+  note: string;
+  body: string;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-8">
+      <h3 className="type-label text-primary">{title}</h3>
+      <p className="type-caption text-muted">{note}</p>
+      <pre className="max-h-screen min-w-0 overflow-auto rounded-md border border-subtle bg-sunken p-16 type-caption text-secondary">
+        {body}
+      </pre>
+    </div>
   );
 }

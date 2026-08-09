@@ -200,6 +200,235 @@ const fairnessSummary: S["FairnessSummary"] = {
   scoreDistribution,
 };
 
+/* ---------------------------------------------------------------
+   Published form schemas. Field ids are the durable thing here: an
+   answer is keyed by one for the life of the program, across label
+   edits and across versions. Kind 6 is a field, kind 10 an option,
+   kind 11 a section, kind 12 a version.
+   --------------------------------------------------------------- */
+
+const answered = (
+  value: S["AnswerValue"],
+  provenance: S["Provenance"],
+  daysAgoStamped: number,
+): S["AnswerRecord"] => ({
+  value,
+  provenance,
+  answeredAt: daysAgo(daysAgoStamped),
+});
+
+const field = (n: number) => uuid(6, n);
+const option = (n: number) => uuid(10, n);
+const section = (n: number) => uuid(11, n);
+const formVersion = (n: number) => uuid(12, n);
+
+// The three downstream flags from architecture 5.4, defaulted off.
+type FlagSet = { matching?: boolean; equity?: boolean; admin?: boolean };
+
+const f = (
+  n: number,
+  type: S["FormFieldType"],
+  label: string,
+  required: boolean,
+  flags: FlagSet,
+  rest: Partial<S["FormField"]> = {},
+): S["FormField"] => ({
+  id: field(n),
+  type,
+  label,
+  help: null,
+  required,
+  matching: flags.matching ?? false,
+  equity: flags.equity ?? false,
+  admin: flags.admin ?? false,
+  visibleWhen: null,
+  ...rest,
+});
+
+const opts = (start: number, labels: string[]): S["FormOption"][] =>
+  labels.map((label, i) => ({ id: option(start + i), label }));
+
+const MENTORED_BEFORE = opts(1, ["Yes", "No", "I am not sure"]);
+const FOCUS_AREAS = opts(10, [
+  "Backend fundamentals",
+  "System design",
+  "Testing",
+  "Career direction",
+  "Interview preparation",
+  "Open source",
+]);
+const CADENCE = opts(20, ["Weekly", "Fortnightly", "Monthly"]);
+const MENTOR_CAPACITY = opts(30, ["One mentee", "Two mentees", "Three mentees"]);
+
+const menteeForm: S["FormVersion"] = {
+  id: formVersion(1),
+  programId: PROGRAM,
+  role: "mentee",
+  version: 3,
+  publishedAt: daysAgo(45),
+  sections: [
+    {
+      id: section(1),
+      title: "About you",
+      description: "The basics. Nothing here is scored.",
+      fields: [
+        f(1, "short_text", "What should we call you?", true, { admin: true }, {
+          help: "The name your mentor will see.",
+          text: { minLength: 2, maxLength: 80, placeholder: null },
+        }),
+        f(2, "short_text", "Where are you based?", true, { matching: true }, {
+          help: "City and country is enough. We use it to find an overlapping working day.",
+          text: { minLength: 2, maxLength: 80, placeholder: null },
+        }),
+        f(3, "date", "When would you like to start?", false, { admin: true }, {
+          date: { min: "2026-09-01", max: "2026-12-31" },
+        }),
+      ],
+    },
+    {
+      id: section(2),
+      title: "Your background",
+      description: null,
+      fields: [
+        f(4, "number", "How many years have you been writing code?", true, { equity: true }, {
+          help: "Count anything, including learning on your own.",
+          number: { min: 0, max: 40, step: 1, unit: "years" },
+        }),
+        f(5, "single_select", "Have you been mentored before?", true, { equity: true }, {
+          options: MENTORED_BEFORE,
+        }),
+        // The conditional. Someone who has never had a mentor is exactly the
+        // person whose answer needs drawing out, so the follow-up appears for
+        // them rather than for everyone.
+        f(6, "long_text", "What has been hardest to work out on your own?", true, { equity: true }, {
+          help: "Two or three sentences. There is no right answer and this is not a test.",
+          text: { minLength: 40, maxLength: 1200, placeholder: null },
+          visibleWhen: {
+            all: [
+              { fieldId: field(5), operator: "equals", value: option(2) },
+            ],
+          },
+        }),
+        f(7, "multi_select", "What would you like to work on?", true, { matching: true }, {
+          help: "Pick up to three.",
+          options: FOCUS_AREAS,
+          selection: { min: 1, max: 3 },
+        }),
+      ],
+    },
+    {
+      id: section(3),
+      title: "What you want from mentoring",
+      description: null,
+      fields: [
+        f(8, "long_text", "What would make this six months worth it?", true, { matching: true, equity: true }, {
+          help: "Say it in your own words. Plain is better than polished.",
+          text: { minLength: 60, maxLength: 2000, placeholder: null },
+        }),
+        f(9, "scale", "How confident do you feel about your next career step?", true, { equity: true }, {
+          scale: { min: 1, max: 5, minLabel: "Not at all", maxLabel: "Very" },
+        }),
+      ],
+    },
+    {
+      id: section(4),
+      title: "Practicalities",
+      description: null,
+      fields: [
+        f(10, "single_select", "How often would you like to meet?", true, { matching: true }, {
+          options: CADENCE,
+        }),
+        f(11, "file", "Attach a CV, if you have one", false, { admin: true }, {
+          help: "PDF or Word, up to 5 MB. Not having one will not count against you.",
+          file: {
+            accept: ["application/pdf", "application/msword", ".docx"],
+            maxSizeBytes: 5_242_880,
+          },
+        }),
+      ],
+    },
+    {
+      id: section(5),
+      title: "Before you send this",
+      description: null,
+      fields: [
+        f(12, "consent", "Sharing your answers with your mentor", true, { admin: true }, {
+          consent: {
+            statement:
+              "I agree that my answers can be shown to the mentor I am matched with.",
+            documentUrl: null,
+          },
+        }),
+        f(13, "consent", "Reporting", false, { admin: true }, {
+          consent: {
+            statement:
+              "I agree that anonymised answers can be used in the programme's public report.",
+            documentUrl: null,
+          },
+        }),
+      ],
+    },
+  ],
+};
+
+/** Mentors answer a different form. Architecture 5.4: separate per role. */
+const mentorForm: S["FormVersion"] = {
+  id: formVersion(2),
+  programId: PROGRAM,
+  role: "mentor",
+  version: 2,
+  publishedAt: daysAgo(45),
+  sections: [
+    {
+      id: section(10),
+      title: "About you",
+      description: null,
+      fields: [
+        f(20, "short_text", "What should we call you?", true, { admin: true }, {
+          text: { minLength: 2, maxLength: 80, placeholder: null },
+        }),
+        f(21, "short_text", "What do you do day to day?", true, { matching: true }, {
+          help: "One line. It appears under your name in the directory.",
+          text: { minLength: 2, maxLength: 120, placeholder: null },
+        }),
+      ],
+    },
+    {
+      id: section(11),
+      title: "How you can help",
+      description: null,
+      fields: [
+        f(22, "multi_select", "What can you help someone with?", true, { matching: true }, {
+          options: FOCUS_AREAS,
+          selection: { min: 1, max: 6 },
+        }),
+        f(23, "single_select", "How many mentees can you take?", true, { admin: true }, {
+          options: MENTOR_CAPACITY,
+        }),
+        f(24, "long_text", "What was your own path into this work?", false, { matching: true }, {
+          help: "Mentees read this. Honest beats impressive.",
+          text: { minLength: 0, maxLength: 2000, placeholder: null },
+        }),
+      ],
+    },
+    {
+      id: section(12),
+      title: "Before you send this",
+      description: null,
+      fields: [
+        f(25, "consent", "Code of conduct", true, { admin: true }, {
+          consent: {
+            statement: "I have read the programme's code of conduct and agree to it.",
+            documentUrl: null,
+          },
+        }),
+      ],
+    },
+  ],
+};
+
+export const FORM_VERSIONS: S["FormVersion"][] = [menteeForm, mentorForm];
+
 const member = (
   entry: S["RosterEntry"],
   skills: string[],
@@ -457,12 +686,30 @@ export function createDb() {
       submittedAt: daysAgo(2),
       editableUntil: daysAhead(21),
       matchingOpensAt: daysAhead(37),
+      formVersionId: menteeForm.id,
+      // Keyed by field id, never by label. Halima answered the conditional
+      // follow-up, which is only asked of people who have not been mentored
+      // before, and that answer is marked `guided` because it came out of the
+      // elicitation prompt rather than the blank box.
       answers: {
-        goal: "I want to move from building small scripts to shipping a real backend service.",
-        years_experience: 1,
-        skills: ["Python", "HTML", "CSS"],
-        timezone: "Africa/Kano",
-        consent_share_demographics: true,
+        [field(1)]: answered("Halima", "self", 2),
+        [field(2)]: answered("Kano, Nigeria", "self", 2),
+        [field(4)]: answered(1, "self", 2),
+        [field(5)]: answered(option(2), "self", 2),
+        [field(6)]: answered(
+          "Knowing whether the way I have built something is the normal way or just my way. I can make things work but I cannot tell if they are right.",
+          "guided",
+          2,
+        ),
+        [field(7)]: answered([option(10), option(12)], "self", 2),
+        [field(8)]: answered(
+          "I want to stop guessing. By the end I would like to have shipped one service that other people use and to understand why it is built the way it is.",
+          "self",
+          2,
+        ),
+        [field(9)]: answered(2, "self", 2),
+        [field(10)]: answered(option(21), "self", 2),
+        [field(12)]: answered(true, "self", 2),
       },
     },
   ];
@@ -507,6 +754,7 @@ export function createDb() {
     strandSummaries: summaries,
     messages,
     applications,
+    formVersions: FORM_VERSIONS,
     session,
     /** Tokens handed out by POST /auth/magic-link, consumed by /auth/verify. */
     magicLinkTokens: new Set<string>(["valid-token"]),

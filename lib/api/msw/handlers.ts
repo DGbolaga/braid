@@ -50,6 +50,26 @@ export const handlers = [
     return HttpResponse.json(db.program);
   }),
 
+  http.get(
+    url("/orgs/:orgSlug/programs/:programSlug/form-schema"),
+    ({ params, request }) => {
+      if (params.orgSlug !== ORG_SLUG || params.programSlug !== PROGRAM_SLUG) {
+        return notFound("program");
+      }
+      const role = new URL(request.url).searchParams.get("role");
+      const found = db.formVersions.find(
+        (v) => v.role === role && v.publishedAt !== null,
+      );
+      return found
+        ? HttpResponse.json(found)
+        : problem(
+            404,
+            "no_published_form",
+            "This programme has no published form for that role yet.",
+          );
+    },
+  ),
+
   http.post(
     url("/orgs/:orgSlug/programs/:programSlug/applications"),
     async ({ params, request }) => {
@@ -66,6 +86,21 @@ export const handlers = [
       if (db.applications.some((a) => a.email === body.email)) {
         return problem(409, "already_applied", "An application already exists for this email address.");
       }
+      const version = db.formVersions.find((v) => v.id === body.formVersionId);
+      if (!version || version.role !== body.role) {
+        return problem(
+          409,
+          "stale_form_version",
+          "The form has changed since you started. Reload to see the current questions.",
+        );
+      }
+
+      // The client asserts provenance; the server owns the clock.
+      const now = new Date().toISOString();
+      const answers: S["Application"]["answers"] = {};
+      for (const [fieldId, answer] of Object.entries(body.answers ?? {})) {
+        answers[fieldId] = { ...answer, answeredAt: now };
+      }
 
       const created: S["Application"] = {
         id: nextId(5),
@@ -78,7 +113,8 @@ export const handlers = [
         submittedAt: new Date().toISOString(),
         editableUntil: db.program.applicationsCloseAt,
         matchingOpensAt: db.program.matchingOpensAt,
-        answers: body.answers ?? {},
+        formVersionId: version.id,
+        answers,
       };
       db.applications.push(created);
       return HttpResponse.json(created, { status: 201 });

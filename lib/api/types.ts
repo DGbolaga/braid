@@ -28,6 +28,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orgs/{orgSlug}/programs/{programSlug}/form-schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+                programSlug: components["parameters"]["ProgramSlug"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Read the published form schema for a role
+         * @description Mentors and mentees answer different questions, so the role is required
+         *     rather than defaulted.
+         *
+         *     Returns the currently published version. Publishing a change mints a new
+         *     version and leaves submitted applications on the one they were filled
+         *     against, so an answer is always readable against the questions that were
+         *     actually asked.
+         *
+         *     Public, because the application form is filled before anyone has an
+         *     account.
+         */
+        get: operations["getFormSchema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/orgs/{orgSlug}/programs/{programSlug}/applications": {
         parameters: {
             query?: never;
@@ -42,9 +74,9 @@ export interface paths {
         put?: never;
         /**
          * Submit an application to a program
-         * @description Answers are keyed by question id. The slice runs on a hardcoded form, so
-         *     no schema is fetched first; the shape already accommodates the published
-         *     schema arriving later.
+         * @description Answers are keyed by field id, taken from the form version named in
+         *     `formVersionId`. Fields hidden by a condition are absent rather than
+         *     null: a question nobody was shown has no answer.
          */
         post: operations["submitApplication"];
         delete?: never;
@@ -344,6 +376,142 @@ export interface components {
         PriorityBand: "high" | "medium" | "low";
         /** @description One answer to one question. */
         AnswerValue: string | number | boolean | string[];
+        /**
+         * @description Where the words came from. `self` is typed unprompted; `guided` is the
+         *     answer to an elicitation follow-up on the guided completion screen.
+         *
+         *     Recorded because scoring free text rewards writing fluency, which tracks
+         *     schooling and language background. Reports have to be able to ask
+         *     whether coverage improved without the guided answers quietly becoming a
+         *     ranking feature.
+         * @enum {string}
+         */
+        Provenance: "self" | "guided";
+        /**
+         * @description One answer on the way in. There is no timestamp: the server stamps it,
+         *     because a client-supplied time is not evidence of anything.
+         */
+        AnswerInput: {
+            value: components["schemas"]["AnswerValue"];
+            provenance: components["schemas"]["Provenance"];
+        };
+        /** @description One stored answer, as read back. */
+        AnswerRecord: {
+            value: components["schemas"]["AnswerValue"];
+            provenance: components["schemas"]["Provenance"];
+            /** Format: date-time */
+            answeredAt: string;
+        };
+        /** @enum {string} */
+        FormFieldType: "short_text" | "long_text" | "single_select" | "multi_select" | "scale" | "number" | "date" | "file" | "consent";
+        /**
+         * @description `id` is what an answer stores. Labels are editable copy and must never be
+         *     the key, or fixing a typo would orphan every answer that used it.
+         */
+        FormOption: {
+            /** Format: uuid */
+            id: string;
+            label: string;
+        };
+        FormClause: {
+            /** Format: uuid */
+            fieldId: string;
+            /** @enum {string} */
+            operator: "equals" | "not_equals" | "includes" | "is_answered" | "gt" | "lt";
+            value?: components["schemas"]["AnswerValue"];
+        };
+        /**
+         * @description Every clause must hold. One level deep on purpose: `any` can be added
+         *     beside `all` later without migrating a single stored schema.
+         */
+        FormCondition: {
+            all: components["schemas"]["FormClause"][];
+        };
+        FormField: {
+            /**
+             * Format: uuid
+             * @description Stable for the life of the question, across versions and across
+             *     label edits. Answers are keyed by this and never by the label.
+             */
+            id: string;
+            type: components["schemas"]["FormFieldType"];
+            label: string;
+            help?: string | null;
+            required: boolean;
+            /** @description Feeds the similarity score. */
+            matching: boolean;
+            /** @description Feeds the priority score. */
+            equity: boolean;
+            /** @description Collected, never scored, visible to the coordinator only. */
+            admin: boolean;
+            visibleWhen?: components["schemas"]["FormCondition"] | null;
+            /** @description Select types only. */
+            options?: components["schemas"]["FormOption"][] | null;
+            text?: {
+                minLength?: number | null;
+                maxLength?: number | null;
+                placeholder?: string | null;
+            } | null;
+            number?: {
+                min?: number | null;
+                max?: number | null;
+                step?: number | null;
+                unit?: string | null;
+            } | null;
+            scale?: {
+                min: number;
+                max: number;
+                minLabel?: string | null;
+                maxLabel?: string | null;
+            } | null;
+            date?: {
+                /** Format: date */
+                min?: string | null;
+                /** Format: date */
+                max?: string | null;
+            } | null;
+            file?: {
+                accept: string[];
+                maxSizeBytes: number;
+            } | null;
+            consent?: {
+                /**
+                 * @description The sentence next to the checkbox. Separate from `label`, which
+                 *     names the question in the coordinator's list.
+                 */
+                statement: string;
+                /** Format: uri */
+                documentUrl?: string | null;
+            } | null;
+            /** @description Multi select only. */
+            selection?: {
+                min?: number | null;
+                max?: number | null;
+            } | null;
+        };
+        FormSection: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            description?: string | null;
+            fields: components["schemas"]["FormField"][];
+        };
+        /**
+         * @description The whole published document. Stored as one versioned JSONB blob rather
+         *     than normalised rows: it is read whole, written whole, and never queried
+         *     field by field.
+         */
+        FormVersion: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            programId: string;
+            role: components["schemas"]["Role"];
+            version: number;
+            /** Format: date-time */
+            publishedAt?: string | null;
+            sections: components["schemas"]["FormSection"][];
+        };
         Organisation: {
             /** Format: uuid */
             id: string;
@@ -380,8 +548,20 @@ export interface components {
             name: string;
             /** Format: email */
             email: string;
+            /**
+             * Format: uuid
+             * @description Which published version was on screen. Sent so the server can reject
+             *     a submission filled against a version that is no longer current,
+             *     rather than storing answers to questions nobody can reconstruct.
+             */
+            formVersionId: string;
+            /**
+             * @description Keyed by field id. Answers to fields hidden by a condition are not
+             *     sent; the client keeps them locally in case the person toggles back,
+             *     but an unasked question has no answer.
+             */
             answers: {
-                [key: string]: components["schemas"]["AnswerValue"];
+                [key: string]: components["schemas"]["AnswerInput"];
             };
         };
         Application: {
@@ -401,8 +581,14 @@ export interface components {
             editableUntil?: string | null;
             /** Format: date-time */
             matchingOpensAt?: string | null;
+            /**
+             * Format: uuid
+             * @description The version these answers were filled against. Reading them back
+             *     without it would mean guessing which questions were asked.
+             */
+            formVersionId: string;
             answers: {
-                [key: string]: components["schemas"]["AnswerValue"];
+                [key: string]: components["schemas"]["AnswerRecord"];
             };
         };
         MagicLinkRequest: {
@@ -718,6 +904,40 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    getFormSchema: {
+        parameters: {
+            query: {
+                role: components["schemas"]["Role"];
+            };
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+                programSlug: components["parameters"]["ProgramSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The published form version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            /** @description No such program, or no published form for that role */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     submitApplication: {

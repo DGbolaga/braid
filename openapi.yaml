@@ -7,8 +7,10 @@ info:
     Thin vertical slice: program lookup, application intake, magic-link auth,
     roster, matching runs with a fairness summary, and strands with messages.
 
-    Deliberately excluded until the step that needs them: the published form
-    schema (the apply screen currently renders a hardcoded form), and the
+    The published form schema is here too, so the apply screen renders what a
+    coordinator built rather than a hardcoded set of questions.
+
+    Deliberately excluded until the step that needs them: file upload, and the
     pair-level run actions (swap, lock, reject, re-run).
 
 servers:
@@ -55,6 +57,46 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /orgs/{orgSlug}/programs/{programSlug}/form-schema:
+    parameters:
+      - $ref: "#/components/parameters/OrgSlug"
+      - $ref: "#/components/parameters/ProgramSlug"
+    get:
+      operationId: getFormSchema
+      tags: [Public]
+      summary: Read the published form schema for a role
+      description: |
+        Mentors and mentees answer different questions, so the role is required
+        rather than defaulted.
+
+        Returns the currently published version. Publishing a change mints a new
+        version and leaves submitted applications on the one they were filled
+        against, so an answer is always readable against the questions that were
+        actually asked.
+
+        Public, because the application form is filled before anyone has an
+        account.
+      security: []
+      parameters:
+        - name: role
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/Role"
+      responses:
+        "200":
+          description: The published form version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormVersion"
+        "404":
+          description: No such program, or no published form for that role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
   /orgs/{orgSlug}/programs/{programSlug}/applications:
     parameters:
       - $ref: "#/components/parameters/OrgSlug"
@@ -64,9 +106,9 @@ paths:
       tags: [Public]
       summary: Submit an application to a program
       description: |
-        Answers are keyed by question id. The slice runs on a hardcoded form, so
-        no schema is fetched first; the shape already accommodates the published
-        schema arriving later.
+        Answers are keyed by field id, taken from the form version named in
+        `formVersionId`. Fields hidden by a condition are absent rather than
+        null: a question nobody was shown has no answer.
       security: []
       requestBody:
         required: true
@@ -612,6 +654,248 @@ components:
           items:
             type: string
 
+    Provenance:
+      type: string
+      enum: [self, guided]
+      description: |
+        Where the words came from. `self` is typed unprompted; `guided` is the
+        answer to an elicitation follow-up on the guided completion screen.
+
+        Recorded because scoring free text rewards writing fluency, which tracks
+        schooling and language background. Reports have to be able to ask
+        whether coverage improved without the guided answers quietly becoming a
+        ranking feature.
+
+    AnswerInput:
+      type: object
+      required: [value, provenance]
+      description: |
+        One answer on the way in. There is no timestamp: the server stamps it,
+        because a client-supplied time is not evidence of anything.
+      properties:
+        value:
+          $ref: "#/components/schemas/AnswerValue"
+        provenance:
+          $ref: "#/components/schemas/Provenance"
+
+    AnswerRecord:
+      type: object
+      required: [value, provenance, answeredAt]
+      description: One stored answer, as read back.
+      properties:
+        value:
+          $ref: "#/components/schemas/AnswerValue"
+        provenance:
+          $ref: "#/components/schemas/Provenance"
+        answeredAt:
+          type: string
+          format: date-time
+
+    FormFieldType:
+      type: string
+      enum:
+        [
+          short_text,
+          long_text,
+          single_select,
+          multi_select,
+          scale,
+          number,
+          date,
+          file,
+          consent,
+        ]
+
+    FormOption:
+      type: object
+      required: [id, label]
+      description: |
+        `id` is what an answer stores. Labels are editable copy and must never be
+        the key, or fixing a typo would orphan every answer that used it.
+      properties:
+        id:
+          type: string
+          format: uuid
+        label:
+          type: string
+
+    FormClause:
+      type: object
+      required: [fieldId, operator]
+      properties:
+        fieldId:
+          type: string
+          format: uuid
+        operator:
+          type: string
+          enum: [equals, not_equals, includes, is_answered, gt, lt]
+        value:
+          $ref: "#/components/schemas/AnswerValue"
+
+    FormCondition:
+      type: object
+      required: [all]
+      description: |
+        Every clause must hold. One level deep on purpose: `any` can be added
+        beside `all` later without migrating a single stored schema.
+      properties:
+        all:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/FormClause"
+
+    FormField:
+      type: object
+      required: [id, type, label, required, matching, equity, admin]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: |
+            Stable for the life of the question, across versions and across
+            label edits. Answers are keyed by this and never by the label.
+        type:
+          $ref: "#/components/schemas/FormFieldType"
+        label:
+          type: string
+        help:
+          type: [string, "null"]
+        required:
+          type: boolean
+        matching:
+          type: boolean
+          description: Feeds the similarity score.
+        equity:
+          type: boolean
+          description: Feeds the priority score.
+        admin:
+          type: boolean
+          description: Collected, never scored, visible to the coordinator only.
+        visibleWhen:
+          oneOf:
+            - $ref: "#/components/schemas/FormCondition"
+            - type: "null"
+        options:
+          type: [array, "null"]
+          description: Select types only.
+          items:
+            $ref: "#/components/schemas/FormOption"
+        text:
+          type: [object, "null"]
+          properties:
+            minLength:
+              type: [integer, "null"]
+            maxLength:
+              type: [integer, "null"]
+            placeholder:
+              type: [string, "null"]
+        number:
+          type: [object, "null"]
+          properties:
+            min:
+              type: [number, "null"]
+            max:
+              type: [number, "null"]
+            step:
+              type: [number, "null"]
+            unit:
+              type: [string, "null"]
+        scale:
+          type: [object, "null"]
+          required: [min, max]
+          properties:
+            min:
+              type: integer
+            max:
+              type: integer
+            minLabel:
+              type: [string, "null"]
+            maxLabel:
+              type: [string, "null"]
+        date:
+          type: [object, "null"]
+          properties:
+            min:
+              type: [string, "null"]
+              format: date
+            max:
+              type: [string, "null"]
+              format: date
+        file:
+          type: [object, "null"]
+          required: [accept, maxSizeBytes]
+          properties:
+            accept:
+              type: array
+              items:
+                type: string
+            maxSizeBytes:
+              type: integer
+        consent:
+          type: [object, "null"]
+          required: [statement]
+          properties:
+            statement:
+              type: string
+              description: |
+                The sentence next to the checkbox. Separate from `label`, which
+                names the question in the coordinator's list.
+            documentUrl:
+              type: [string, "null"]
+              format: uri
+        selection:
+          type: [object, "null"]
+          description: Multi select only.
+          properties:
+            min:
+              type: [integer, "null"]
+            max:
+              type: [integer, "null"]
+
+    FormSection:
+      type: object
+      required: [id, title, fields]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        fields:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormField"
+
+    FormVersion:
+      type: object
+      required: [id, programId, role, version, sections]
+      description: |
+        The whole published document. Stored as one versioned JSONB blob rather
+        than normalised rows: it is read whole, written whole, and never queried
+        field by field.
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/Role"
+        version:
+          type: integer
+          minimum: 1
+        publishedAt:
+          type: [string, "null"]
+          format: date-time
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormSection"
+
     Organisation:
       type: object
       required: [id, slug, name]
@@ -683,7 +967,7 @@ components:
 
     ApplicationCreate:
       type: object
-      required: [role, name, email, answers]
+      required: [role, name, email, formVersionId, answers]
       properties:
         role:
           $ref: "#/components/schemas/Role"
@@ -693,14 +977,36 @@ components:
         email:
           type: string
           format: email
+        formVersionId:
+          type: string
+          format: uuid
+          description: |
+            Which published version was on screen. Sent so the server can reject
+            a submission filled against a version that is no longer current,
+            rather than storing answers to questions nobody can reconstruct.
         answers:
           type: object
+          description: |
+            Keyed by field id. Answers to fields hidden by a condition are not
+            sent; the client keeps them locally in case the person toggles back,
+            but an unasked question has no answer.
           additionalProperties:
-            $ref: "#/components/schemas/AnswerValue"
+            $ref: "#/components/schemas/AnswerInput"
 
     Application:
       type: object
-      required: [id, programId, role, name, email, status, submittedAt, answers]
+      required:
+        [
+          id,
+          programId,
+          role,
+          name,
+          email,
+          status,
+          submittedAt,
+          formVersionId,
+          answers,
+        ]
       properties:
         id:
           type: string
@@ -728,10 +1034,16 @@ components:
         matchingOpensAt:
           type: [string, "null"]
           format: date-time
+        formVersionId:
+          type: string
+          format: uuid
+          description: |
+            The version these answers were filled against. Reading them back
+            without it would mean guessing which questions were asked.
         answers:
           type: object
           additionalProperties:
-            $ref: "#/components/schemas/AnswerValue"
+            $ref: "#/components/schemas/AnswerRecord"
 
     MagicLinkRequest:
       type: object
