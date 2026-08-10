@@ -618,6 +618,12 @@ export function createDb() {
     openRoles: ["mentee", "mentor"],
     mentorCount: MENTORS.length,
     menteeCount: MENTEES.length,
+    // Capacity is the sum of what the mentors said they could take.
+    capacity: MENTORS.reduce((n, [, , , cap]) => n + cap, 0),
+    placesRemaining: Math.max(
+      0,
+      MENTORS.reduce((n, [, , , cap]) => n + cap, 0) - MENTEES.length,
+    ),
   };
 
   const runs: S["RunDetail"][] = [
@@ -755,6 +761,8 @@ export function createDb() {
     messages,
     applications,
     formVersions: FORM_VERSIONS,
+    drafts: [] as S["ApplicationDraft"][],
+    waitlist: [] as Array<{ email: string; role?: S["Role"] }>,
     session,
     /** Tokens handed out by POST /auth/magic-link, consumed by /auth/verify. */
     magicLinkTokens: new Set<string>(["valid-token"]),

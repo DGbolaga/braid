@@ -176,7 +176,7 @@ Everywhere else is Switzer. The restraint is what makes it land when it does app
 
 ### 5.3 Scale
 
-Base 16px, ratio 1.25, rounded to whole pixels.
+Base 16px, ratio 1.25, rounded to whole pixels. Thirteen tokens.
 
 |Token|Size / line height|Face|Use|
 |---|---|---|---|
@@ -191,6 +191,10 @@ Base 16px, ratio 1.25, rounded to whole pixels.
 |`label`|13 / 16, tracking 2%, uppercase|Switzer 600|Form labels, eyebrows, table headers|
 |`caption`|12 / 18|Switzer 400|Helper text, timestamps|
 |`data-m`|15 / 20, tabular|JetBrains Mono 500|Scores, counts, percentages|
+|`data-l`|40 / 46, tracking -1.5%, tabular|JetBrains Mono 500|Live counts at display size, narrow|
+|`data-xl`|56 / 60, tracking -2%, tabular|JetBrains Mono 500|Landing hero counts, match reveal|
+
+`data-l` and `data-xl` share their metrics with `display-l` and `display-xl` so a mono number and a Gambetta line sit on one baseline grid. They exist because section 9 puts live counts at display size in the mono face, in the landing hero and again in the match reveal, and the mono axis had only one step. Numbers only. A word never takes them.
 
 **Rules.** Never more than three sizes in one view. Body copy caps at 68 characters per line. Sentence case everywhere except the `label` token. No italics except in a quoted participant response, where the quote is the participant's own words and the italic marks it as theirs.
 

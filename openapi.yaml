@@ -134,6 +134,107 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+  /orgs/{orgSlug}/programs/{programSlug}/waitlist:
+    parameters:
+      - $ref: "#/components/parameters/OrgSlug"
+      - $ref: "#/components/parameters/ProgramSlug"
+    post:
+      operationId: joinWaitlist
+      tags: [Public]
+      summary: Ask to be told when the next round opens
+      description: |
+        The action a closed, full or not-yet-open programme offers instead of a
+        dead end. Always returns 202, for the same reason the magic-link
+        endpoint does: a different answer for a known address would make this an
+        enumeration oracle.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                role:
+                  $ref: "#/components/schemas/Role"
+      responses:
+        "202":
+          description: Accepted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orgs/{orgSlug}/programs/{programSlug}/application-draft:
+    parameters:
+      - $ref: "#/components/parameters/OrgSlug"
+      - $ref: "#/components/parameters/ProgramSlug"
+    get:
+      operationId: getApplicationDraft
+      tags: [Public]
+      summary: Read a saved draft
+      security: []
+      parameters:
+        - name: draftId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationDraft"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: saveApplicationDraft
+      tags: [Public]
+      summary: Autosave a partly filled application
+      description: |
+        Upsert. Omit `draftId` on the first call and the server mints one; the
+        client holds it and sends it back on every later save.
+
+        The draft is reachable by whoever holds the id, which is the same
+        exposure as `GET /applications/{applicationId}` and is acceptable for
+        the same reason: it carries no credential and grants nothing beyond the
+        answers already typed on that device.
+
+        Not yet built: emailing a resume link, which architecture 3.2 lists as
+        an action. Until it exists the id lives only in the browser that started
+        the form, and the screen says so rather than implying otherwise.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationDraftSave"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationDraft"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Applications are closed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
   /applications/{applicationId}:
     parameters:
       - name: applicationId
@@ -964,6 +1065,60 @@ components:
           type: integer
         menteeCount:
           type: integer
+        capacity:
+          type: [integer, "null"]
+          description: |
+            How many mentees this round can take, from the mentors who have
+            signed up and the capacity each set.
+        placesRemaining:
+          type: [integer, "null"]
+          description: |
+            Design direction section 9 puts this in the landing hero, and
+            section 1 requires scarcity to be shown rather than hidden: a full
+            round says zero rather than dropping the number. Null only where a
+            programme has not set capacity at all.
+
+    ApplicationDraftSave:
+      type: object
+      required: [role, formVersionId, answers]
+      properties:
+        draftId:
+          type: string
+          format: uuid
+          description: Omit on the first save. The server mints one and returns it.
+        role:
+          $ref: "#/components/schemas/Role"
+        formVersionId:
+          type: string
+          format: uuid
+        answers:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AnswerInput"
+
+    ApplicationDraft:
+      type: object
+      required: [draftId, role, formVersionId, answers, savedAt]
+      properties:
+        draftId:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/Role"
+        formVersionId:
+          type: string
+          format: uuid
+        answers:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AnswerRecord"
+        savedAt:
+          type: string
+          format: date-time
+          description: |
+            What the autosave indicator shows. Section 9: a timestamp, never a
+            spinner — a spinner says "wait", and the applicant has nothing to
+            wait for.
 
     ApplicationCreate:
       type: object

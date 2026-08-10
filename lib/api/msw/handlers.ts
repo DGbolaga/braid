@@ -71,6 +71,68 @@ export const handlers = [
   ),
 
   http.post(
+    url("/orgs/:orgSlug/programs/:programSlug/waitlist"),
+    async ({ params, request }) => {
+      if (params.orgSlug !== ORG_SLUG || params.programSlug !== PROGRAM_SLUG) {
+        return notFound("program");
+      }
+      const body = (await request.json()) as { email?: string; role?: S["Role"] };
+      if (!body?.email?.includes("@")) {
+        return problem(400, "invalid_email", "Enter a valid email address.");
+      }
+      db.waitlist.push({ email: body.email, role: body.role });
+      return new HttpResponse(null, { status: 202 });
+    },
+  ),
+
+  http.get(
+    url("/orgs/:orgSlug/programs/:programSlug/application-draft"),
+    ({ params, request }) => {
+      if (params.orgSlug !== ORG_SLUG || params.programSlug !== PROGRAM_SLUG) {
+        return notFound("program");
+      }
+      const draftId = new URL(request.url).searchParams.get("draftId");
+      const found = db.drafts.find((d) => d.draftId === draftId);
+      return found ? HttpResponse.json(found) : notFound("draft");
+    },
+  ),
+
+  http.put(
+    url("/orgs/:orgSlug/programs/:programSlug/application-draft"),
+    async ({ params, request }) => {
+      if (params.orgSlug !== ORG_SLUG || params.programSlug !== PROGRAM_SLUG) {
+        return notFound("program");
+      }
+      if (db.program.state === "closed" || db.program.state === "full") {
+        return problem(409, "applications_closed", "Applications have closed for this programme.");
+      }
+      const body = (await request.json()) as S["ApplicationDraftSave"];
+      const now = new Date().toISOString();
+      const answers: S["ApplicationDraft"]["answers"] = {};
+      for (const [fieldId, answer] of Object.entries(body.answers ?? {})) {
+        answers[fieldId] = { ...answer, answeredAt: now };
+      }
+
+      const existing = db.drafts.find((d) => d.draftId === body.draftId);
+      if (existing) {
+        existing.answers = answers;
+        existing.savedAt = now;
+        return HttpResponse.json(existing);
+      }
+
+      const created: S["ApplicationDraft"] = {
+        draftId: nextId(13),
+        role: body.role,
+        formVersionId: body.formVersionId,
+        answers,
+        savedAt: now,
+      };
+      db.drafts.push(created);
+      return HttpResponse.json(created);
+    },
+  ),
+
+  http.post(
     url("/orgs/:orgSlug/programs/:programSlug/applications"),
     async ({ params, request }) => {
       if (params.orgSlug !== ORG_SLUG || params.programSlug !== PROGRAM_SLUG) {

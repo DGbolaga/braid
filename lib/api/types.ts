@@ -85,6 +85,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/orgs/{orgSlug}/programs/{programSlug}/waitlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+                programSlug: components["parameters"]["ProgramSlug"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask to be told when the next round opens
+         * @description The action a closed, full or not-yet-open programme offers instead of a
+         *     dead end. Always returns 202, for the same reason the magic-link
+         *     endpoint does: a different answer for a known address would make this an
+         *     enumeration oracle.
+         */
+        post: operations["joinWaitlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{orgSlug}/programs/{programSlug}/application-draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+                programSlug: components["parameters"]["ProgramSlug"];
+            };
+            cookie?: never;
+        };
+        /** Read a saved draft */
+        get: operations["getApplicationDraft"];
+        /**
+         * Autosave a partly filled application
+         * @description Upsert. Omit `draftId` on the first call and the server mints one; the
+         *     client holds it and sends it back on every later save.
+         *
+         *     The draft is reachable by whoever holds the id, which is the same
+         *     exposure as `GET /applications/{applicationId}` and is acceptable for
+         *     the same reason: it carries no credential and grants nothing beyond the
+         *     answers already typed on that device.
+         *
+         *     Not yet built: emailing a resume link, which architecture 3.2 lists as
+         *     an action. Until it exists the id lives only in the browser that started
+         *     the form, and the screen says so rather than implying otherwise.
+         */
+        put: operations["saveApplicationDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/applications/{applicationId}": {
         parameters: {
             query?: never;
@@ -542,6 +602,48 @@ export interface components {
             openRoles: components["schemas"]["Role"][];
             mentorCount: number;
             menteeCount: number;
+            /**
+             * @description How many mentees this round can take, from the mentors who have
+             *     signed up and the capacity each set.
+             */
+            capacity?: number | null;
+            /**
+             * @description Design direction section 9 puts this in the landing hero, and
+             *     section 1 requires scarcity to be shown rather than hidden: a full
+             *     round says zero rather than dropping the number. Null only where a
+             *     programme has not set capacity at all.
+             */
+            placesRemaining?: number | null;
+        };
+        ApplicationDraftSave: {
+            /**
+             * Format: uuid
+             * @description Omit on the first save. The server mints one and returns it.
+             */
+            draftId?: string;
+            role: components["schemas"]["Role"];
+            /** Format: uuid */
+            formVersionId: string;
+            answers: {
+                [key: string]: components["schemas"]["AnswerInput"];
+            };
+        };
+        ApplicationDraft: {
+            /** Format: uuid */
+            draftId: string;
+            role: components["schemas"]["Role"];
+            /** Format: uuid */
+            formVersionId: string;
+            answers: {
+                [key: string]: components["schemas"]["AnswerRecord"];
+            };
+            /**
+             * Format: date-time
+             * @description What the autosave indicator shows. Section 9: a timestamp, never a
+             *     spinner — a spinner says "wait", and the applicant has nothing to
+             *     wait for.
+             */
+            savedAt: string;
         };
         ApplicationCreate: {
             role: components["schemas"]["Role"];
@@ -968,6 +1070,101 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             /** @description Applications are closed, or this email already applied */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    joinWaitlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+                programSlug: components["parameters"]["ProgramSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: email */
+                    email: string;
+                    role?: components["schemas"]["Role"];
+                };
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getApplicationDraft: {
+        parameters: {
+            query: {
+                draftId: string;
+            };
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+                programSlug: components["parameters"]["ProgramSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationDraft"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveApplicationDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+                programSlug: components["parameters"]["ProgramSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationDraftSave"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationDraft"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            /** @description Applications are closed */
             409: {
                 headers: {
                     [name: string]: unknown;

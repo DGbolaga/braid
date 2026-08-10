@@ -27,6 +27,36 @@ const SIZE: Record<ButtonSize, string> = {
   lg: "control-lg",
 };
 
+/**
+ * The button's look, without the button. A link that acts as a primary action
+ * is an `<a>` — it navigates — so it takes these classes rather than being
+ * wrapped in a button element that lies about what it does.
+ *
+ * Loading and the disabled variants stay inside `Button`: a link cannot be
+ * either.
+ */
+export function buttonClasses({
+  variant = "primary",
+  size = "md",
+  className = "",
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  className?: string;
+} = {}) {
+  return [
+    "pointer-coarse:min-h-field",
+    "relative inline-flex items-center justify-center gap-8",
+    "rounded-md type-body-m whitespace-nowrap",
+    "transition-[background-color,border-color,color,transform] duration-instant ease-out",
+    "outline-focus outline-offset-2 focus-visible:outline-2",
+    "active:scale-98",
+    SIZE[size],
+    VARIANT[variant],
+    className,
+  ].join(" ");
+}
+
 export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
   size?: ButtonSize;

@@ -11,7 +11,8 @@ import {
   StrandCardSkeleton,
 } from "@/components/strand/strand-card";
 import type { components } from "@/lib/api/types";
-import { FormRenderer } from "@/components/form/form-renderer";
+import { ErrorSummary, FormRenderer } from "@/components/form/form-renderer";
+import { useAnswerForm, type AnswerInputMap } from "@/components/form/use-answer-form";
 import { FORM_VERSIONS } from "@/lib/api/msw/fixtures";
 import { visibleFieldIds, type FormValues } from "@/lib/form/conditions";
 import { toJsonSchema } from "@/lib/form/json-schema";
@@ -370,20 +371,29 @@ const MENTEE_FORM = FORM_VERSIONS[0];
 function FormPlayground() {
   const [values, setValues] = useState<FormValues>({});
   const [payload, setPayload] = useState<string | null>(null);
+  const form = useAnswerForm({ version: MENTEE_FORM });
 
   const visible = visibleFieldIds(MENTEE_FORM, values);
   const jsonSchema = toJsonSchema(MENTEE_FORM, visible);
 
   return (
     <div className="grid gap-32 lg:grid-cols-2">
-      <div className="max-w-public">
-        <FormRenderer
-          version={MENTEE_FORM}
-          submitLabel="Send"
-          onValuesChange={setValues}
-          onSubmit={(answers) => setPayload(JSON.stringify(answers, null, 2))}
-        />
-      </div>
+      <form
+        noValidate
+        className="flex max-w-public flex-col gap-48"
+        onChange={() => setValues(form.getValues())}
+        onSubmit={form.submit((answers: AnswerInputMap) =>
+          setPayload(JSON.stringify(answers, null, 2)),
+        )}
+      >
+        {form.isSubmitted && <ErrorSummary form={form} />}
+        <FormRenderer form={form} />
+        <div className="flex">
+          <Button type="submit" size="lg" loading={form.isSubmitting} loadingLabel="Sending">
+            Send
+          </Button>
+        </div>
+      </form>
 
       <div className="flex min-w-0 flex-col gap-24 lg:sticky lg:top-32 lg:self-start">
         <Panel

@@ -18,6 +18,7 @@ export type ControlProps = {
   register: UseFormRegister<FormValues>;
   errors: FieldErrors<FormValues>;
   mark: "required" | "optional";
+  emphasis?: "label" | "question";
   disabled?: boolean;
 };
 
@@ -38,6 +39,7 @@ export function FieldControl({
   register,
   errors,
   mark,
+  emphasis,
   disabled,
 }: ControlProps) {
   const error = errors[field.id]?.message as string | undefined;
@@ -47,6 +49,7 @@ export function FieldControl({
     error,
     required: field.required,
     mark,
+    emphasis,
     disabled,
   };
   const blank = (v: unknown) => (v === "" || v === undefined ? undefined : v);

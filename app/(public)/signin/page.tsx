@@ -1,7 +1,9 @@
+import { PublicMain } from "@/components/shell/public-shell";
+
 export default function Page() {
   return (
-    <div className="flex flex-col gap-8">
+    <PublicMain>
       <h1 className="type-heading-l text-primary">Sign in</h1>
-    </div>
+    </PublicMain>
   );
 }

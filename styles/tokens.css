@@ -146,6 +146,10 @@
      not family or case, which is precisely the half-right version this system
      must not allow. They live as `@utility type-*` at the end of this file. */
 
+  /* Public chrome. 72 on desktop, 56 below md, both from the design file. */
+  --height-header: 72px;
+  --height-header-sm: 56px;
+
   --height-control-sm: 32px;
   --height-control-md: 40px;
   --height-control-lg: 48px;
@@ -384,6 +388,41 @@
   font-weight: 500;
   letter-spacing: normal;
   font-variant-numeric: tabular-nums;
+}
+
+/* The mono axis at display size. Section 9 sets the landing hero and the match
+   reveal as live numbers "in the mono face, at display size", and data-m at
+   15/20 cannot carry that. Metrics match display-l and display-xl exactly, so a
+   mono number and a Gambetta line sit on the same baseline grid. */
+
+@utility type-data-l {
+  font-family: var(--font-data);
+  font-size: 40px;
+  line-height: 46px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility type-data-xl {
+  font-family: var(--font-data);
+  font-size: 56px;
+  line-height: 60px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The wordmark is identity, not type, so it is not one of the thirteen tokens.
+   Section 3.2: display face, weight 500, tracking -2%, cap height 60 percent of
+   the mark. Sized here against the 32px mark the public header uses. */
+
+@utility wordmark {
+  font-family: var(--font-display);
+  font-size: 19px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 /* Control sizing. 8.1 pairs heights 40/32/48 with horizontal padding 16/12/20,

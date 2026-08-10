@@ -105,6 +105,7 @@ Renders whatever the coordinator built in the form builder. This page has no har
 - Field types to support: short text, long text, single select, multi select, scale, number, date, file upload, consent checkbox.
 - Actions: save and continue later (emails a resume link), back, next, submit.
 - Behaviour: autosave on blur. Client-side validation on required fields. Role is fixed from the query param and shown, not editable mid-form.
+- Not built yet: the emailed resume link. Autosave writes to `PUT /orgs/{org}/programs/{program}/application-draft` and the draft id is held in the browser that started the form, so a draft cannot currently be picked up on another device. The screen says so plainly rather than implying a persistence it does not have. Building the link needs an endpoint that mints and mails a scoped token, the same shape as the magic link.
 
 ### 3.3 Application submitted `/p/:orgSlug/:programSlug/applied`
 
@@ -426,9 +427,13 @@ Short pages, but they are the difference between a system that feels solid and o
 
 ## 7. Frontend shape
 
-Three shells, which means three layouts and three navigation structures.
+Four shells, which means four layouts and four navigation structures.
 
-**Public shell.** No chrome. Centred single column, max 720px. Organisation logo, program name, content, footer. Works on a 360px phone because most applicants will arrive from WhatsApp on a phone.
+**Public shell.** Centred single column, max 720px. Works on a 360px phone, because most applicants arrive from a WhatsApp link on a phone.
+
+Chrome is landing-and-apply only: a 72px header carrying the mark, the wordmark and Sign in, full bleed above the column rather than inside it. Someone who arrives cold on the landing page needs to know who is asking and needs a door if they already have an account. The other public routes stay bare — someone on `/verify` is one click from being signed in and does not need a way out of it.
+
+**Account shell.** `/settings` and `/programs`. Minimal header, no program switcher, and the guard resolves the account and session only, because neither route carries an organisation or a program in the URL and so cannot inherit the participant guard. Sign out lives here.
 
 **Participant shell.** Header with organisation logo, program switcher, notification bell, avatar menu. Primary nav is five items maximum: Home, Strands, Directory, Resources, Profile. On mobile this becomes a bottom tab bar. Content is a single column, max 900px. The strand detail page is the one exception and needs a two-column layout on desktop that stacks on mobile.
 

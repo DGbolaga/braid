@@ -23,7 +23,19 @@ export type FieldOwnProps = {
   error?: string;
   required?: boolean;
   mark?: "required" | "optional" | "none";
+  /**
+   * `question` sets the label in heading-m instead of the label token, for the
+   * one-question-per-view wizard on mobile where the question is the page.
+   *
+   * The element stays a real `<label>` bound to its control. Only the type
+   * token changes, so there is no second code path and no way to end up with a
+   * heading that is not a label.
+   */
+  emphasis?: "label" | "question";
 };
+
+export const labelType = (emphasis: FieldOwnProps["emphasis"]) =>
+  emphasis === "question" ? "type-heading-m" : "type-label";
 
 /**
  * `typography` is a parameter rather than something a caller appends via
@@ -86,6 +98,7 @@ function FieldShell({
   error,
   required,
   mark,
+  emphasis,
   controlId,
   helperId,
   errorId,
@@ -98,7 +111,10 @@ function FieldShell({
 }) {
   return (
     <div className="flex flex-col gap-8">
-      <label htmlFor={controlId} className="flex items-center gap-8 type-label text-primary">
+      <label
+        htmlFor={controlId}
+        className={`flex flex-wrap items-center gap-8 text-primary ${labelType(emphasis)}`}
+      >
         {label}
         <Mark mark={mark} required={required} />
       </label>
@@ -122,6 +138,7 @@ export function FieldsetShell({
   error,
   required,
   mark,
+  emphasis,
   helperId,
   errorId,
   children,
@@ -139,7 +156,9 @@ export function FieldsetShell({
       aria-invalid={error ? true : undefined}
       aria-describedby={error ? errorId : helper ? helperId : undefined}
     >
-      <legend className="mb-8 flex items-center gap-8 type-label text-primary">
+      <legend
+        className={`mb-8 flex flex-wrap items-center gap-8 text-primary ${labelType(emphasis)}`}
+      >
         {label}
         <Mark mark={mark} required={required} />
       </legend>
@@ -164,6 +183,7 @@ export function Field({
   error,
   required,
   mark,
+  emphasis,
   numeric = false,
   className = "",
   ...rest
@@ -180,6 +200,7 @@ export function Field({
       error={error}
       required={required}
       mark={mark}
+      emphasis={emphasis}
       controlId={controlId}
       helperId={helperId}
       errorId={errorId}
@@ -206,6 +227,7 @@ export function TextareaField({
   error,
   required,
   mark,
+  emphasis,
   rows = 4,
   className = "",
   ...rest
@@ -222,6 +244,7 @@ export function TextareaField({
       error={error}
       required={required}
       mark={mark}
+      emphasis={emphasis}
       controlId={controlId}
       helperId={helperId}
       errorId={errorId}

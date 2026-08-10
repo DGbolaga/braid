@@ -5,6 +5,7 @@ import { CheckIcon, ChevronDownIcon } from "@/components/icon/icons";
 import {
   FieldsetShell,
   controlClasses,
+  labelType,
   type FieldOwnProps,
 } from "@/components/ui/input";
 
@@ -153,6 +154,7 @@ function NativeSelectControl({
   error,
   required,
   mark,
+  emphasis,
 }: FieldOwnProps & {
   options: Option[];
   value: string | undefined;
@@ -168,7 +170,10 @@ function NativeSelectControl({
 
   return (
     <div className="flex flex-col gap-8">
-      <label htmlFor={controlId} className="flex items-center gap-8 type-label text-primary">
+      <label
+        htmlFor={controlId}
+        className={`flex flex-wrap items-center gap-8 text-primary ${labelType(emphasis)}`}
+      >
         {label}
         {mark !== "optional" && required && <span className="text-muted">Required</span>}
         {mark === "optional" && !required && <span className="text-muted">Optional</span>}
@@ -470,6 +475,7 @@ export function FileControl({
   error,
   required,
   mark,
+  emphasis,
 }: FieldOwnProps & {
   accept: string[];
   maxSizeBytes: number;
@@ -508,7 +514,10 @@ export function FileControl({
 
   return (
     <div className="flex flex-col gap-8">
-      <label htmlFor={controlId} className="flex items-center gap-8 type-label text-primary">
+      <label
+        htmlFor={controlId}
+        className={`flex flex-wrap items-center gap-8 text-primary ${labelType(emphasis)}`}
+      >
         {label}
         {mark !== "optional" && required && <span className="text-muted">Required</span>}
         {mark === "optional" && !required && <span className="text-muted">Optional</span>}
