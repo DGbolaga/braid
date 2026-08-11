@@ -232,6 +232,13 @@ export const handlers = [
     return db.signedIn ? HttpResponse.json(db.session) : unauthorized();
   }),
 
+  http.get(url("/programs/:programId/home"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("program");
+    return HttpResponse.json(db.home);
+  }),
+
   http.get(url("/programs/:programId/roster"), ({ params, request }) => {
     const denied = requireSession();
     if (denied) return denied;

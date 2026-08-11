@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "Bash(node *)",
+      "Bash(npx tsc *)",
+      "Read(//tmp/claude-1000/-home-gbolaga-daramola-Braid/**)",
+      "Read(//home/gbolaga-daramola/.cache/**)",
+      "Bash(curl -s --max-time 3 http://localhost:9226/json/version)",
+      "Bash(python3 -)",
+      "Bash(curl -s http://localhost:3000/ui)",
+      "Bash(read c *)",
+      "Bash(curl -s http://localhost:3000__TRACKED_VAR__)",
+      "Bash(nohup google-chrome --headless=new --remote-debugging-port=9226 --no-first-run --no-sandbox --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --user-data-dir=/tmp/claude-1000/-home-gbolaga-daramola-Braid/9f8a9c7d-3445-4b6f-a580-1bd5a238dcd9/scratchpad/cp3 about:blank)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pkill -f \"remote-debugging-port=9226\")",
+      "Bash(npm install *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" \"http://localhost:3000/p/she-code-africa/backend-cohort-4\")",
+      "Bash(chmod +x /tmp/claude-1000/-home-gbolaga-daramola-Braid/9f8a9c7d-3445-4b6f-a580-1bd5a238dcd9/scratchpad/state-check.sh)",
+      "Bash(/tmp/claude-1000/-home-gbolaga-daramola-Braid/9f8a9c7d-3445-4b6f-a580-1bd5a238dcd9/scratchpad/state-check.sh closed *)",
+      "Bash(/tmp/claude-1000/-home-gbolaga-daramola-Braid/9f8a9c7d-3445-4b6f-a580-1bd5a238dcd9/scratchpad/state-check.sh full *)",
+      "Bash(/tmp/claude-1000/-home-gbolaga-daramola-Braid/9f8a9c7d-3445-4b6f-a580-1bd5a238dcd9/scratchpad/state-check.sh not_yet_open *)",
+      "Bash(/tmp/claude-1000/-home-gbolaga-daramola-Braid/9f8a9c7d-3445-4b6f-a580-1bd5a238dcd9/scratchpad/state-check.sh open *)",
+      "Bash(echo \"=== tsc exit: $? ===\")",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'Update CLAUDE.md: commands, architecture, correct type token count *)",
+      "Bash(git commit -q -m 'Step 7B: home and strand detail *)"
+    ]
+  }
+}

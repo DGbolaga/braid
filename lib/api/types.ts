@@ -255,6 +255,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/home": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Everything the participant home screen puts on the page
+         * @description One request, because home answers one question — what should I do right
+         *     now — and four round trips to answer it would leave the screen
+         *     assembling itself in front of the reader.
+         *
+         *     Composed for the screen rather than mirroring a table. Architecture 4.1
+         *     fixes the contents: next action, active strands, profile completeness,
+         *     the coordinator's announcement, and the next milestone. The strands
+         *     themselves stay on their own endpoint, because the strands list needs
+         *     them too.
+         */
+        get: operations["getHome"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/roster": {
         parameters: {
             query?: never;
@@ -831,6 +861,61 @@ export interface components {
             pageSize: number;
             total: number;
         };
+        /** @enum {string} */
+        NextActionKind: "complete_profile" | "accept_request" | "reply_to_message" | "log_session" | "fill_check_in";
+        /**
+         * @description The one thing worth doing, chosen by the server. Singular on purpose:
+         *     design direction 9 gives home one next-action card and says that if
+         *     there is no next action, say so plainly rather than inventing one. A
+         *     list of three would be a list of none.
+         */
+        NextAction: {
+            kind: components["schemas"]["NextActionKind"];
+            title: string;
+            body?: string | null;
+            /** @description The verb here is the verb in the resulting toast. */
+            actionLabel: string;
+            /**
+             * @description Relative to the program root. Nothing is done on home; every action
+             *     is a link into the page that resolves it.
+             */
+            href: string;
+        };
+        Announcement: {
+            /** Format: uuid */
+            id: string;
+            body: string;
+            authorName: string;
+            /** Format: date-time */
+            postedAt: string;
+        };
+        Milestone: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            /** Format: date-time */
+            dueAt: string;
+            completed: boolean;
+        };
+        HomeSummary: {
+            /**
+             * Format: date-time
+             * @description The date the waiting state is built around. Design direction 1: a
+             *     participant signs up in September and is matched in October, and
+             *     for those three weeks this date is the whole screen.
+             */
+            matchingOpensAt?: string | null;
+            /**
+             * @description Mentors signed up to this program. Shown before matching so the
+             *     wait reads as being part of something already populated.
+             */
+            mentorCount: number;
+            strandCount: number;
+            profileCompleteness: number;
+            nextAction?: components["schemas"]["NextAction"] | null;
+            announcement?: components["schemas"]["Announcement"] | null;
+            upcomingMilestone?: components["schemas"]["Milestone"] | null;
+        };
         StrandMember: {
             /** Format: uuid */
             participationId: string;
@@ -1297,6 +1382,31 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    getHome: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The home summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HomeSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listRoster: {

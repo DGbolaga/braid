@@ -27,6 +27,8 @@ tags:
     description: No session required. Reachable from a cold link.
   - name: Auth
     description: Magic-link sign in.
+  - name: Participant
+    description: Screens scoped to one program, for the person in it.
   - name: Roster
     description: Approved participants in a program.
   - name: Matching
@@ -356,6 +358,37 @@ paths:
                 $ref: "#/components/schemas/Session"
         "401":
           $ref: "#/components/responses/Unauthorized"
+
+  /programs/{programId}/home:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: getHome
+      tags: [Participant]
+      summary: Everything the participant home screen puts on the page
+      description: |
+        One request, because home answers one question — what should I do right
+        now — and four round trips to answer it would leave the screen
+        assembling itself in front of the reader.
+
+        Composed for the screen rather than mirroring a table. Architecture 4.1
+        fixes the contents: next action, active strands, profile completeness,
+        the coordinator's announcement, and the next milestone. The strands
+        themselves stay on their own endpoint, because the strands list needs
+        them too.
+      responses:
+        "200":
+          description: The home summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HomeSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /programs/{programId}/roster:
     parameters:
@@ -1498,6 +1531,106 @@ components:
           type: integer
         total:
           type: integer
+
+    NextActionKind:
+      type: string
+      enum:
+        [
+          complete_profile,
+          accept_request,
+          reply_to_message,
+          log_session,
+          fill_check_in,
+        ]
+
+    NextAction:
+      type: object
+      required: [kind, title, actionLabel, href]
+      description: |
+        The one thing worth doing, chosen by the server. Singular on purpose:
+        design direction 9 gives home one next-action card and says that if
+        there is no next action, say so plainly rather than inventing one. A
+        list of three would be a list of none.
+      properties:
+        kind:
+          $ref: "#/components/schemas/NextActionKind"
+        title:
+          type: string
+        body:
+          type: [string, "null"]
+        actionLabel:
+          type: string
+          description: The verb here is the verb in the resulting toast.
+        href:
+          type: string
+          description: |
+            Relative to the program root. Nothing is done on home; every action
+            is a link into the page that resolves it.
+
+    Announcement:
+      type: object
+      required: [id, body, authorName, postedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        body:
+          type: string
+        authorName:
+          type: string
+        postedAt:
+          type: string
+          format: date-time
+
+    Milestone:
+      type: object
+      required: [id, title, dueAt, completed]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        dueAt:
+          type: string
+          format: date-time
+        completed:
+          type: boolean
+
+    HomeSummary:
+      type: object
+      required: [profileCompleteness, strandCount, mentorCount]
+      properties:
+        matchingOpensAt:
+          type: [string, "null"]
+          format: date-time
+          description: |
+            The date the waiting state is built around. Design direction 1: a
+            participant signs up in September and is matched in October, and
+            for those three weeks this date is the whole screen.
+        mentorCount:
+          type: integer
+          description: |
+            Mentors signed up to this program. Shown before matching so the
+            wait reads as being part of something already populated.
+        strandCount:
+          type: integer
+        profileCompleteness:
+          type: number
+          minimum: 0
+          maximum: 1
+        nextAction:
+          oneOf:
+            - $ref: "#/components/schemas/NextAction"
+            - type: "null"
+        announcement:
+          oneOf:
+            - $ref: "#/components/schemas/Announcement"
+            - type: "null"
+        upcomingMilestone:
+          oneOf:
+            - $ref: "#/components/schemas/Milestone"
+            - type: "null"
 
     StrandMember:
       type: object

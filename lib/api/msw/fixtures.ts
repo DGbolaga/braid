@@ -7,6 +7,12 @@ export const NOW = new Date("2026-08-08T09:00:00.000Z");
 
 const daysAgo = (n: number) =>
   new Date(NOW.getTime() - n * 86_400_000).toISOString();
+/** Same day, a chosen hour. Without it every message is timestamped 09:00. */
+const dayAt = (n: number, hour: number, minute: number) => {
+  const d = new Date(NOW.getTime() - n * 86_400_000);
+  d.setUTCHours(hour, minute, 0, 0);
+  return d.toISOString();
+};
 const daysAhead = (n: number) =>
   new Date(NOW.getTime() + n * 86_400_000).toISOString();
 
@@ -47,26 +53,26 @@ const MENTORS: MentorSeed[] = [
   ["Samuel Adeyemi", "Africa/Lagos", ["Django", "PostgreSQL"], 2, 0, "Backend engineer", 0.7],
 ];
 
-// name, timezone, skills, band, completeness
-type MenteeSeed = [string, string, string[], S["PriorityBand"], number];
+// name, timezone, skills, band, completeness, headline
+type MenteeSeed = [string, string, string[], S["PriorityBand"], number, string];
 
 const MENTEES: MenteeSeed[] = [
-  ["Blessing Adewale", "Africa/Lagos", ["Python", "Flask"], "high", 0.9],
-  ["Ngozi Obi", "Africa/Lagos", ["JavaScript", "React"], "medium", 0.85],
-  ["Fatima Yusuf", "Africa/Kano", ["Python"], "high", 0.6],
-  ["David Otieno", "Africa/Nairobi", ["Node.js", "Express"], "medium", 0.8],
-  ["Grace Mwangi", "Africa/Nairobi", ["Java"], "low", 0.95],
-  ["Emeka Nnamdi", "Africa/Lagos", ["Go", "Docker"], "medium", 0.75],
-  ["Aisha Bello", "Africa/Lagos", ["SQL", "Python"], "high", 0.55],
-  ["Joy Achieng", "Africa/Nairobi", ["TypeScript"], "low", 0.9],
-  ["Tobi Salami", "Africa/Lagos", ["Python", "Django"], "medium", 0.8],
-  ["Halima Sani", "Africa/Kano", ["HTML", "CSS"], "high", 0.4],
-  ["Chinedu Okafor", "Africa/Lagos", ["Java", "Spring"], "low", 0.85],
-  ["Zainab Musa", "Africa/Lagos", ["Python", "Pandas"], "high", 0.65],
-  ["Peter Kimani", "Africa/Nairobi", ["Kubernetes"], "medium", 0.9],
-  ["Adaeze Ugo", "Africa/Lagos", ["TypeScript", "Node.js"], "medium", 0.88],
-  ["Yusuf Ibrahim", "Africa/Kano", ["Python"], "high", 0.35],
-  ["Lerato Molefe", "Africa/Johannesburg", ["Go"], "low", 0.7],
+  ["Blessing Adewale", "Africa/Lagos", ["Python", "Flask"], "high", 0.9, "Building an expense tracker in Flask"],
+  ["Ngozi Obi", "Africa/Lagos", ["JavaScript", "React"], "medium", 0.85, "Front-end developer moving to the back"],
+  ["Fatima Yusuf", "Africa/Kano", ["Python"], "high", 0.6, "Teaching herself Python in the evenings"],
+  ["David Otieno", "Africa/Nairobi", ["Node.js", "Express"], "medium", 0.8, "Junior engineer, internal tools"],
+  ["Grace Mwangi", "Africa/Nairobi", ["Java"], "low", 0.95, "Java developer, first year in industry"],
+  ["Emeka Nnamdi", "Africa/Lagos", ["Go", "Docker"], "medium", 0.75, "Support engineer learning Go"],
+  ["Aisha Bello", "Africa/Lagos", ["SQL", "Python"], "high", 0.55, "Analyst writing more SQL than spreadsheets"],
+  ["Joy Achieng", "Africa/Nairobi", ["TypeScript"], "low", 0.9, "Bootcamp graduate, six months out"],
+  ["Tobi Salami", "Africa/Lagos", ["Python", "Django"], "medium", 0.8, "Building a library API on his own"],
+  ["Halima Sani", "Africa/Kano", ["HTML", "CSS"], "high", 0.4, "First year of a computer science degree"],
+  ["Chinedu Okafor", "Africa/Lagos", ["Java", "Spring"], "low", 0.85, "Contract developer, Spring services"],
+  ["Zainab Musa", "Africa/Lagos", ["Python", "Pandas"], "high", 0.65, "Data analyst who wants to ship code"],
+  ["Peter Kimani", "Africa/Nairobi", ["Kubernetes"], "medium", 0.9, "Ops engineer learning Kubernetes properly"],
+  ["Adaeze Ugo", "Africa/Lagos", ["TypeScript", "Node.js"], "medium", 0.88, "Freelance developer, Node services"],
+  ["Yusuf Ibrahim", "Africa/Kano", ["Python"], "high", 0.35, "Career changer, six months in"],
+  ["Lerato Molefe", "Africa/Johannesburg", ["Go"], "low", 0.7, "Backend intern, Go and Postgres"],
 ];
 
 const mentorEntries: S["RosterEntry"][] = MENTORS.map(
@@ -506,6 +512,16 @@ const STRAND_SEEDS: StrandSeed[] = [
     ],
   },
   {
+    // Matched this morning, nothing written. The state the design file draws:
+    // somebody is waiting on the other end and the screen has to say so.
+    n: 5,
+    menteeIdx: 5,
+    lastActivityDaysAgo: 0,
+    unread: 0,
+    nextSessionInDays: null,
+    messages: [],
+  },
+  {
     n: 4,
     menteeIdx: 4,
     lastActivityDaysAgo: 40,
@@ -535,7 +551,7 @@ function buildStrands() {
     const partner = member(
       menteeEntry,
       menteeSkills(seed.menteeIdx),
-      "Mentee",
+      MENTEES[seed.menteeIdx][5],
     );
 
     const thread: S["Message"][] = seed.messages.map(
@@ -550,14 +566,14 @@ function buildStrands() {
               photoUrl: null,
             },
         body,
-        sentAt: daysAgo(ago),
+        sentAt: dayAt(ago, 8 + ((i * 5) % 11), (i * 17) % 60),
         deliveryState: "delivered",
         clientToken: null,
       }),
     );
 
     messages[id] = thread;
-    const last = thread[thread.length - 1];
+    const last = thread.length > 0 ? thread[thread.length - 1] : null;
     const state = seed.state ?? "active";
     const endedAt =
       seed.endedDaysAgo === undefined ? null : daysAgo(seed.endedDaysAgo);
@@ -569,7 +585,11 @@ function buildStrands() {
       originMode: "batch",
       members: [meMember, partner],
       matchRationale: `Matched on a shared focus in ${menteeSkills(seed.menteeIdx)[0]} and backend fundamentals, with a two-hour timezone overlap. This names the strongest signals; in a whole-cohort assignment the outcome also depends on who else was available.`,
-      createdAt: daysAgo(Math.max(...seed.messages.map(([, ago]) => ago)) + 2),
+      createdAt: daysAgo(
+        seed.messages.length > 0
+          ? Math.max(...seed.messages.map(([, ago]) => ago)) + 2
+          : 0,
+      ),
       endedAt,
     });
 
@@ -579,11 +599,9 @@ function buildStrands() {
       state,
       originMode: "batch",
       members: [partner],
-      lastMessage: {
-        authorName: last.author.name,
-        body: last.body,
-        sentAt: last.sentAt,
-      },
+      lastMessage: last
+        ? { authorName: last.author.name, body: last.body, sentAt: last.sentAt }
+        : null,
       lastActivityAt: daysAgo(seed.lastActivityDaysAgo),
       unreadCount: seed.unread,
       nextSessionAt:
@@ -624,6 +642,37 @@ export function createDb() {
       0,
       MENTORS.reduce((n, [, , , cap]) => n + cap, 0) - MENTEES.length,
     ),
+  };
+
+  /**
+   * Architecture 4.1, composed for the screen. The signed-in account is a
+   * mentor with three live strands and one that ended, so home renders in its
+   * populated state; flip `strandCount` and the empty state takes over.
+   */
+  const home: S["HomeSummary"] = {
+    matchingOpensAt: daysAhead(37),
+    mentorCount: MENTORS.length,
+    strandCount: 3,
+    profileCompleteness: 0.85,
+    nextAction: {
+      kind: "log_session",
+      title: "Log your session with Blessing",
+      body: "You met on Tuesday. Two lines is enough, and it is what the report is built from.",
+      actionLabel: "Log the session",
+      href: `/strands/${uuid(8, 1)}`,
+    },
+    announcement: {
+      id: uuid(14, 1),
+      body: "Halfway check-ins open next week. If a strand has gone quiet, say so in yours — it is not a mark against anyone and it is the only way I can help.",
+      authorName: "Amara Okonkwo",
+      postedAt: daysAgo(3),
+    },
+    upcomingMilestone: {
+      id: uuid(15, 1),
+      title: "Agree a shared goal for the cohort",
+      dueAt: daysAhead(9),
+      completed: false,
+    },
   };
 
   const runs: S["RunDetail"][] = [
@@ -760,6 +809,7 @@ export function createDb() {
     strandSummaries: summaries,
     messages,
     applications,
+    home,
     formVersions: FORM_VERSIONS,
     drafts: [] as S["ApplicationDraft"][],
     waitlist: [] as Array<{ email: string; role?: S["Role"] }>,

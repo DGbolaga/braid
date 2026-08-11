@@ -1,34 +1,13 @@
 import Link from "next/link";
 import type { components } from "@/lib/api/types";
+import { Avatar, RoleChip, strandColour, type Tone } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 
 type StrandSummary = components["schemas"]["StrandSummary"];
-type StrandMember = components["schemas"]["StrandMember"];
 
 /** 8.3: a strand goes quiet after fourteen days with no activity. */
 const QUIET_AFTER_DAYS = 14;
 const DAY = 86_400_000;
-
-/**
- * Which of the three strand colours a person gets. Derived from the
- * participation id rather than from the position in the list, so the same
- * person is the same colour on every screen and a re-sort does not reshuffle
- * the page. Neither the design file nor 8.3 specifies the rule.
- */
-function strandColour(participationId: string): "1" | "2" | "3" {
-  let h = 0;
-  for (let i = 0; i < participationId.length; i++) {
-    h = (h * 31 + participationId.charCodeAt(i)) % 3;
-  }
-  return String(h + 1) as "1" | "2" | "3";
-}
-
-function initials(name: string) {
-  const parts = name.trim().split(/\s+/);
-  const first = parts[0]?.[0] ?? "";
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return (first + last).toUpperCase();
-}
 
 function capitalise(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -68,48 +47,6 @@ function formatEnded(iso: string, timeZone: string) {
     month: "long",
     timeZone,
   }).format(new Date(iso));
-}
-
-/**
- * 40px, tinted with the member's strand colour. 8.3 colours only the chip; the
- * design file tints both and treats them as one identity unit, which is the
- * version being built.
- *
- * `neutral` drops the colour for a strand that has ended.
- */
-function Avatar({
-  member,
-  neutral = false,
-}: {
-  member: StrandMember;
-  neutral?: boolean;
-}) {
-  return (
-    <span
-      data-strand={neutral ? "none" : strandColour(member.participationId)}
-      aria-hidden="true"
-      className="avatar inline-flex items-center justify-center rounded-full bg-strand-avatar type-label text-strand-avatar-text"
-    >
-      {initials(member.name)}
-    </span>
-  );
-}
-
-function Chip({
-  tone,
-  children,
-}: {
-  tone: "1" | "2" | "3" | "none";
-  children: React.ReactNode;
-}) {
-  return (
-    <span
-      data-strand={tone}
-      className="inline-flex shrink-0 items-center rounded-full bg-strand-chip px-8 type-caption text-strand-chip-text"
-    >
-      {children}
-    </span>
-  );
 }
 
 // Geometry only. The border colour is set per state at the call site: two
@@ -169,7 +106,7 @@ export function StrandCard({
     ? `Group of ${members.length + 1}`
     : capitalise(partner?.role ?? "");
 
-  const chipTone: "1" | "2" | "3" | "none" =
+  const chipTone: Tone =
     ended || isGroup || !partner ? "none" : strandColour(partner.participationId);
 
   // One line under the name. The strand's condition outranks its last message,
@@ -224,18 +161,26 @@ export function StrandCard({
                     : "-ml-12 rounded-full outline-2 outline-surface"
                 }
               >
-                <Avatar member={m} neutral={ended} />
+                <Avatar
+                  name={m.name}
+                  participationId={m.participationId}
+                  neutral={ended}
+                />
               </span>
             ))}
           </span>
         ) : partner ? (
-          <Avatar member={partner} neutral={ended} />
+          <Avatar
+            name={partner.name}
+            participationId={partner.participationId}
+            neutral={ended}
+          />
         ) : null}
 
         <span className="flex min-w-0 flex-1 flex-col gap-4">
           <span className="flex min-w-0 items-center gap-8">
             <span className="truncate type-heading-s text-primary">{title}</span>
-            <Chip tone={chipTone}>{chip}</Chip>
+            <RoleChip tone={chipTone}>{chip}</RoleChip>
           </span>
 
           {secondary && (

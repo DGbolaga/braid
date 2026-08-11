@@ -150,6 +150,10 @@
   --height-header: 72px;
   --height-header-sm: 56px;
 
+  /* The conversation column's fixed height, from the design file. The thread
+     scrolls inside it so the composer stays put while reading. */
+  --height-thread: 640px;
+
   --height-control-sm: 32px;
   --height-control-md: 40px;
   --height-control-lg: 48px;
@@ -174,6 +178,9 @@
   --container-coordinator: 1200px;
   /* Not in the design direction, which gives content widths but no sidebar. */
   --container-sidebar: 264px;
+  /* The strand detail's left column. Design direction 9 fixes it at 380 and
+     lets the conversation take the rest. */
+  --container-partner: 380px;
 
   /* Controls under 24px only. At 16px a 6px radius is 37 percent of the box
      and a checkbox stops reading as a square, which is the only thing telling
@@ -449,9 +456,31 @@
    nine steps do not cover them. Bound here for the same reason as the control
    heights: the component gets the drawn size without an arbitrary class. */
 
-@utility avatar {
+/* Four avatar sizes, all from the design files: 32 in a message row, 36 in the
+   mobile strand header, 40 in a strand card, 64 on the partner card. Bound here
+   rather than as spacing, for the same reason the control heights are. */
+
+@utility avatar-32 {
+  width: 32px;
+  height: 32px;
+  flex: none;
+}
+
+@utility avatar-36 {
+  width: 36px;
+  height: 36px;
+  flex: none;
+}
+
+@utility avatar-40 {
   width: 40px;
   height: 40px;
+  flex: none;
+}
+
+@utility avatar-64 {
+  width: 64px;
+  height: 64px;
   flex: none;
 }
 
