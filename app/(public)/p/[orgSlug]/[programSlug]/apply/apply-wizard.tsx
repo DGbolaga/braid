@@ -12,6 +12,7 @@ import { ErrorSummary, FormRenderer } from "@/components/form/form-renderer";
 import { useAnswerForm } from "@/components/form/use-answer-form";
 import { visibleFieldsInSection, type FormVersion } from "@/lib/form/conditions";
 import { toFormValues } from "@/lib/form/answers";
+import { submitApplication } from "./actions";
 
 type S = components["schemas"];
 
@@ -151,31 +152,29 @@ export function ApplyWizard({
     }
 
     setSubmitError(undefined);
-    const { data, error } = await api.POST(
-      "/orgs/{orgSlug}/programs/{programSlug}/applications",
-      {
-        params: { path: { orgSlug, programSlug } },
-        body: {
-          role,
-          name: contact.name.trim(),
-          email: contact.email.trim(),
-          formVersionId: version.id,
-          answers: form.answersNow(),
-        },
+    const result = await submitApplication({
+      orgSlug,
+      programSlug,
+      body: {
+        role,
+        name: contact.name.trim(),
+        email: contact.email.trim(),
+        formVersionId: version.id,
+        answers: form.answersNow(),
       },
-    );
+    });
 
-    if (error || !data) {
-      setSubmitError(
-        error?.message ?? "That did not send. Your answers are still here.",
-      );
+    if (!result.ok) {
+      setSubmitError(result.message);
       return;
     }
     draft.clear();
     // replace, not push: back from the confirmation must not re-enter a form
     // that has already been submitted.
     setLeaving(true);
-    router.replace(`/p/${orgSlug}/${programSlug}/applied?id=${data.id}`);
+    router.replace(
+      `/p/${orgSlug}/${programSlug}/applied?id=${result.application.id}`,
+    );
   };
 
   return (
