@@ -20,6 +20,19 @@ const requireSession = () => (db.signedIn ? null : unauthorized());
 const nextId = (kind: number) =>
   `${String(kind).padStart(8, "0")}-0000-4000-8000-${String(++db.seq).padStart(12, "0")}`;
 
+/** Week order, ties broken by position, so the arc always reads forwards. */
+const orderedMilestones = () =>
+  [...db.milestones].sort(
+    (a, b) => a.weekOffset - b.weekOffset || a.position - b.position,
+  );
+
+/** Codes written as {like.this} that are not in the allowed list. */
+function unknownCodes(text: string) {
+  const allowed = new Set(db.mergeCodes.map((c) => c.code));
+  const used = [...text.matchAll(/\{([^}]+)\}/g)].map((m) => m[1].trim());
+  return [...new Set(used.filter((c) => !allowed.has(c)))];
+}
+
 const DECISION_STATUS: Record<string, S["ApplicationStatus"] | undefined> = {
   approve: "approved",
   waitlist: "waitlisted",
@@ -360,6 +373,101 @@ export const handlers = [
       total: filtered.length,
     };
     return HttpResponse.json(body);
+  }),
+
+  http.get(url("/programs/:programId/milestones"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+    return HttpResponse.json(orderedMilestones());
+  }),
+
+  http.put(url("/programs/:programId/milestones"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body = (await request.json()) as S["ProgramMilestonesSave"];
+    if (!Array.isArray(body?.items)) {
+      return problem(400, "invalid_body", "Send the whole arc.");
+    }
+    if (body.items.some((m) => !m.title?.trim())) {
+      return problem(400, "missing_title", "Every milestone needs a title.");
+    }
+
+    db.milestones = body.items.map((item, i) => ({
+      // A milestone that arrives without an id is new. Minting here keeps the
+      // client from having to invent one it cannot guarantee is unique.
+      id: item.id ?? nextId(13),
+      title: item.title.trim(),
+      description: item.description ?? null,
+      weekOffset: item.weekOffset,
+      strandPrompt: item.strandPrompt ?? null,
+      reminderDaysBefore: item.reminderDaysBefore ?? null,
+      position: i + 1,
+    }));
+
+    return HttpResponse.json(orderedMilestones());
+  }),
+
+  http.get(url("/programs/:programId/templates"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body: S["TemplateSet"] = {
+      items: db.templates,
+      mergeCodes: db.mergeCodes,
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.put(url("/programs/:programId/templates/:kind"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const template = db.templates.find((t) => t.kind === params.kind);
+    if (!template) return notFound("template");
+
+    const body = (await request.json()) as S["MessageTemplateSave"];
+    if (!body?.subject?.trim() || !body?.body?.trim()) {
+      return problem(400, "invalid_body", "A template needs a subject and a body.");
+    }
+
+    // Rejected here rather than at send time: an unknown code would otherwise
+    // reach a participant as a literal brace in an email.
+    const unknown = unknownCodes(`${body.subject} ${body.body}`);
+    if (unknown.length > 0) {
+      return problem(
+        400,
+        "unknown_merge_code",
+        `There is no such code as {${unknown[0]}}. Use one from the list.`,
+      );
+    }
+
+    template.subject = body.subject;
+    template.body = body.body;
+    template.isDefault = false;
+    template.updatedAt = new Date().toISOString();
+    template.updatedBy = db.session.account.name;
+
+    return HttpResponse.json(template);
+  }),
+
+  http.delete(url("/programs/:programId/templates/:kind"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const index = db.templates.findIndex((t) => t.kind === params.kind);
+    if (index === -1) return notFound("template");
+
+    const original = db.defaultTemplates.find((t) => t.kind === params.kind);
+    if (!original) return notFound("template");
+
+    db.templates[index] = { ...original };
+    return HttpResponse.json(db.templates[index]);
   }),
 
   http.get(url("/programs/:programId/applications"), ({ params, request }) => {

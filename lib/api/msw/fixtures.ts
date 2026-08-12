@@ -880,6 +880,117 @@ export function createDb() {
     ...unmatchedMentors,
   ];
 
+  /**
+   * The arc from architecture 5.6: what should have happened by week two, week
+   * six, week twelve. Each carries the prompt that appears inside strands when
+   * it lands, which is what stops a milestone being a note in a coordinator's
+   * calendar that nobody in the programme ever sees.
+   */
+  const milestones: S["ProgramMilestone"][] = [
+    {
+      id: uuid(13, 1),
+      title: "First conversation",
+      description:
+        "Both sides have met once and agreed how often they will talk.",
+      weekOffset: 2,
+      strandPrompt:
+        "Have you two managed a first conversation yet? Agreeing how often you will meet is most of the work.",
+      reminderDaysBefore: 3,
+      position: 1,
+    },
+    {
+      id: uuid(13, 2),
+      title: "Goals agreed",
+      description: "The mentee has named what they want out of the six months.",
+      weekOffset: 6,
+      strandPrompt:
+        "What does the mentee want to be able to do by the end? Write it down here, even roughly.",
+      reminderDaysBefore: 7,
+      position: 2,
+    },
+    {
+      id: uuid(13, 3),
+      title: "Halfway review",
+      description: "A check that the pairing is working, while there is time to fix it.",
+      weekOffset: 12,
+      strandPrompt:
+        "You are halfway. What has been useful, and what would you change for the second half?",
+      reminderDaysBefore: 7,
+      position: 3,
+    },
+  ];
+
+  /**
+   * Default wording, written to be sendable as-is. A coordinator who never
+   * opens this page still sends something that reads like a person wrote it.
+   */
+  const DEFAULT_TEMPLATES: S["MessageTemplate"][] = [
+    {
+      kind: "welcome",
+      subject: "You are in, {participant.firstName}",
+      body: "Hello {participant.firstName},\n\nYou are on the roster for {programme.name} at {organisation.name}. Matching runs on {programme.matchingDate}, and you will hear from us either way that day.\n\nThere is nothing you need to do until then. If your profile is not finished, finishing it is the one thing that improves your match.",
+      isDefault: true,
+      updatedAt: null,
+      updatedBy: null,
+    },
+    {
+      kind: "match_notification",
+      subject: "You have been matched with {partner.firstName}",
+      body: "Hello {participant.firstName},\n\nYou have been matched with {partner.firstName} for {programme.name}.\n\nThe first conversation is the hardest one to arrange and the one that decides whether the rest happen. Open your strand and send them a message today if you can.",
+      isDefault: true,
+      updatedAt: null,
+      updatedBy: null,
+    },
+    {
+      kind: "nudge",
+      subject: "It has been quiet in your strand",
+      body: "Hello {participant.firstName},\n\nYou and {partner.firstName} have not spoken in a couple of weeks. That is normal and it is not a failure.\n\nIf the timing has stopped working, say so — rearranging is easier than starting again.",
+      isDefault: true,
+      updatedAt: null,
+      updatedBy: null,
+    },
+    {
+      kind: "mid_point_check_in",
+      subject: "Halfway through {programme.name}",
+      body: "Hello {participant.firstName},\n\nYou are halfway through {programme.name}. We ask everyone the same two questions at this point: what has been useful, and what would you change.\n\nIt takes two minutes and it is what tells us whether to change anything for the second half.",
+      isDefault: true,
+      updatedAt: null,
+      updatedBy: null,
+    },
+    {
+      kind: "closing",
+      subject: "{programme.name} has finished",
+      body: "Hello {participant.firstName},\n\n{programme.name} has come to an end. Thank you for the time you gave it.\n\nYour strand stays open to read back over. If you and {partner.firstName} want to keep talking, nothing here stops you.",
+      isDefault: true,
+      updatedAt: null,
+      updatedBy: null,
+    },
+  ];
+
+  const mergeCodes: S["MergeCode"][] = [
+    {
+      code: "participant.firstName",
+      description: "The person being written to",
+      sample: "Blessing",
+    },
+    {
+      code: "partner.firstName",
+      description: "The other side of their strand",
+      sample: "Amara",
+    },
+    { code: "programme.name", description: "This programme", sample: program.name },
+    {
+      code: "organisation.name",
+      description: "The host organisation",
+      sample: organisation.name,
+    },
+    {
+      code: "programme.matchingDate",
+      description: "When matching runs",
+      sample: "14 September",
+    },
+  ];
+
   const session: S["Session"] = {
     account: me.account,
     participations: [
@@ -921,6 +1032,11 @@ export function createDb() {
     messages,
     applications,
     unmatched,
+    milestones,
+    /** Structured clone so resetting a template can restore untouched text. */
+    templates: DEFAULT_TEMPLATES.map((t) => ({ ...t })),
+    defaultTemplates: DEFAULT_TEMPLATES,
+    mergeCodes,
     home,
     formVersions: FORM_VERSIONS,
     drafts: [] as S["ApplicationDraft"][],

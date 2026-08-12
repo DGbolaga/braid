@@ -3,7 +3,7 @@
 // `useId` is a hook, so these are client components. Form controls carry
 // handlers in every real use anyway.
 import { useId } from "react";
-import type { InputHTMLAttributes, TextareaHTMLAttributes } from "react";
+import type { InputHTMLAttributes, Ref, TextareaHTMLAttributes } from "react";
 import { AlertIcon } from "@/components/icon/icons";
 
 /**
@@ -219,7 +219,14 @@ export function Field({
 }
 
 export type TextareaFieldProps = FieldOwnProps &
-  Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id" | "required">;
+  Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id" | "required"> & {
+    /**
+     * For callers that need the node itself rather than its value — inserting
+     * at the cursor is the case that cannot be done from state alone. React 19
+     * passes `ref` as an ordinary prop, so no forwardRef is involved.
+     */
+    ref?: Ref<HTMLTextAreaElement>;
+  };
 
 export function TextareaField({
   label,

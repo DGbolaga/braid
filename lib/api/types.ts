@@ -304,6 +304,76 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/milestones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** Read the programme arc */
+        get: operations["listProgramMilestones"];
+        /**
+         * Replace the programme arc
+         * @description Written whole rather than per milestone. The arc is one thing a
+         *     coordinator edits as a shape — adding a step changes what comes after
+         *     it — and a sequence of row-level calls would let a half-saved arc exist
+         *     between two of them.
+         */
+        put: operations["saveProgramMilestones"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** Read every message template and the codes they may use */
+        get: operations["listTemplates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/templates/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+                kind: components["schemas"]["TemplateKind"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit one template */
+        put: operations["saveTemplate"];
+        post?: never;
+        /**
+         * Drop the edit and go back to the default wording
+         * @description Removes the programme's override. The default text is Braid's, so this
+         *     cannot fail with nothing to fall back on.
+         */
+        delete: operations["resetTemplate"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/applications": {
         parameters: {
             query?: never;
@@ -903,6 +973,82 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        /**
+         * @description A point in the programme arc, defined against the cohort start rather
+         *     than a calendar date. Cohorts get re-run with new dates and the arc is
+         *     the part that stays the same.
+         *
+         *     Distinct from `Milestone`, which is one participant's resolved instance
+         *     of this — that one has a real due date and a done flag.
+         */
+        ProgramMilestone: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            description?: string | null;
+            /** @description Weeks after the cohort starts. */
+            weekOffset: number;
+            /**
+             * @description Shown inside every strand when this point is reached. The whole
+             *     reason milestones exist rather than living in a coordinator's
+             *     calendar: the arc has to reach the people in it.
+             */
+            strandPrompt?: string | null;
+            /** @description Null means no reminder is sent. */
+            reminderDaysBefore?: number | null;
+            /** @description Order in the arc. Ties on weekOffset are broken by this. */
+            position: number;
+        };
+        ProgramMilestoneInput: {
+            /**
+             * Format: uuid
+             * @description Null for a milestone being added.
+             */
+            id?: string | null;
+            title: string;
+            description?: string | null;
+            weekOffset: number;
+            strandPrompt?: string | null;
+            reminderDaysBefore?: number | null;
+            position: number;
+        };
+        ProgramMilestonesSave: {
+            items: components["schemas"]["ProgramMilestoneInput"][];
+        };
+        /** @enum {string} */
+        TemplateKind: "welcome" | "match_notification" | "nudge" | "mid_point_check_in" | "closing";
+        MessageTemplate: {
+            kind: components["schemas"]["TemplateKind"];
+            subject: string;
+            body: string;
+            /**
+             * @description True while the programme has not overridden the wording. Shown so a
+             *     coordinator can tell what she has written from what she inherited.
+             */
+            isDefault: boolean;
+            /** Format: date-time */
+            updatedAt?: string | null;
+            updatedBy?: string | null;
+        };
+        MessageTemplateSave: {
+            subject: string;
+            body: string;
+        };
+        MergeCode: {
+            /** @description Written in the body as {code}. */
+            code: string;
+            description: string;
+            /**
+             * @description What it resolves to in the preview. Carried by the API so the
+             *     preview shows the same substitution the sender will perform, rather
+             *     than one the browser invented.
+             */
+            sample: string;
+        };
+        TemplateSet: {
+            items: components["schemas"]["MessageTemplate"][];
+            mergeCodes: components["schemas"]["MergeCode"][];
         };
         /**
          * @description The review table's row. Deliberately not the whole Application: a
@@ -1687,6 +1833,155 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RosterPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listProgramMilestones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The milestones, in the order they happen */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramMilestone"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveProgramMilestones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgramMilestonesSave"];
+            };
+        };
+        responses: {
+            /** @description The saved arc, with ids minted for anything new */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramMilestone"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listTemplates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The templates, with the merge codes available to them */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateSet"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+                kind: components["schemas"]["TemplateKind"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageTemplateSave"];
+            };
+        };
+        responses: {
+            /** @description The saved template */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageTemplate"];
+                };
+            };
+            /**
+             * @description The body used a merge code that does not exist. Rejected rather than
+             *     sent, because the failure would otherwise reach a participant as a
+             *     literal brace in an email.
+             */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    resetTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+                kind: components["schemas"]["TemplateKind"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The template, restored to its default */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageTemplate"];
                 };
             };
             401: components["responses"]["Unauthorized"];

@@ -42,6 +42,10 @@ tags:
       Everyone a run left without a strand, each with the reason why. Every
       reason has a different remedy, which is why it is an enum and not a
       message.
+  - name: Setup
+    description: |
+      What a coordinator configures before a cohort runs: the programme arc and
+      the messages it sends.
   - name: Strands
     description: Mentoring relationships and their message threads.
 
@@ -429,6 +433,143 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RosterPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/milestones:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listProgramMilestones
+      tags: [Setup]
+      summary: Read the programme arc
+      responses:
+        "200":
+          description: The milestones, in the order they happen
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProgramMilestone"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: saveProgramMilestones
+      tags: [Setup]
+      summary: Replace the programme arc
+      description: |
+        Written whole rather than per milestone. The arc is one thing a
+        coordinator edits as a shape — adding a step changes what comes after
+        it — and a sequence of row-level calls would let a half-saved arc exist
+        between two of them.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProgramMilestonesSave"
+      responses:
+        "200":
+          description: The saved arc, with ids minted for anything new
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProgramMilestone"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/templates:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listTemplates
+      tags: [Setup]
+      summary: Read every message template and the codes they may use
+      responses:
+        "200":
+          description: The templates, with the merge codes available to them
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateSet"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/templates/{kind}:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+      - name: kind
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/TemplateKind"
+    put:
+      operationId: saveTemplate
+      tags: [Setup]
+      summary: Edit one template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageTemplateSave"
+      responses:
+        "200":
+          description: The saved template
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageTemplate"
+        "400":
+          description: |
+            The body used a merge code that does not exist. Rejected rather than
+            sent, because the failure would otherwise reach a participant as a
+            literal brace in an email.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: resetTemplate
+      tags: [Setup]
+      summary: Drop the edit and go back to the default wording
+      description: |
+        Removes the programme's override. The default text is Braid's, so this
+        cannot fail with nothing to fall back on.
+      responses:
+        "200":
+          description: The template, restored to its default
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageTemplate"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
@@ -1561,6 +1702,140 @@ components:
         joinedAt:
           type: string
           format: date-time
+
+    ProgramMilestone:
+      type: object
+      required: [id, title, weekOffset, position]
+      description: |
+        A point in the programme arc, defined against the cohort start rather
+        than a calendar date. Cohorts get re-run with new dates and the arc is
+        the part that stays the same.
+
+        Distinct from `Milestone`, which is one participant's resolved instance
+        of this — that one has a real due date and a done flag.
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        weekOffset:
+          type: integer
+          minimum: 0
+          description: Weeks after the cohort starts.
+        strandPrompt:
+          type: [string, "null"]
+          description: |
+            Shown inside every strand when this point is reached. The whole
+            reason milestones exist rather than living in a coordinator's
+            calendar: the arc has to reach the people in it.
+        reminderDaysBefore:
+          type: [integer, "null"]
+          minimum: 0
+          description: Null means no reminder is sent.
+        position:
+          type: integer
+          description: Order in the arc. Ties on weekOffset are broken by this.
+
+    ProgramMilestoneInput:
+      type: object
+      required: [title, weekOffset, position]
+      properties:
+        id:
+          type: [string, "null"]
+          format: uuid
+          description: Null for a milestone being added.
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: [string, "null"]
+        weekOffset:
+          type: integer
+          minimum: 0
+        strandPrompt:
+          type: [string, "null"]
+        reminderDaysBefore:
+          type: [integer, "null"]
+          minimum: 0
+        position:
+          type: integer
+
+    ProgramMilestonesSave:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProgramMilestoneInput"
+
+    TemplateKind:
+      type: string
+      enum: [welcome, match_notification, nudge, mid_point_check_in, closing]
+
+    MessageTemplate:
+      type: object
+      required: [kind, subject, body, isDefault]
+      properties:
+        kind:
+          $ref: "#/components/schemas/TemplateKind"
+        subject:
+          type: string
+        body:
+          type: string
+        isDefault:
+          type: boolean
+          description: |
+            True while the programme has not overridden the wording. Shown so a
+            coordinator can tell what she has written from what she inherited.
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+        updatedBy:
+          type: [string, "null"]
+
+    MessageTemplateSave:
+      type: object
+      required: [subject, body]
+      properties:
+        subject:
+          type: string
+          minLength: 1
+        body:
+          type: string
+          minLength: 1
+
+    MergeCode:
+      type: object
+      required: [code, description, sample]
+      properties:
+        code:
+          type: string
+          description: Written in the body as {code}.
+        description:
+          type: string
+        sample:
+          type: string
+          description: |
+            What it resolves to in the preview. Carried by the API so the
+            preview shows the same substitution the sender will perform, rather
+            than one the browser invented.
+
+    TemplateSet:
+      type: object
+      required: [items, mergeCodes]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageTemplate"
+        mergeCodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MergeCode"
 
     ApplicationSummary:
       type: object
