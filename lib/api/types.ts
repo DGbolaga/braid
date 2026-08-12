@@ -304,6 +304,119 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/applications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** List applications submitted to a program */
+        get: operations["listApplications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/applications/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide several applications at once
+         * @description Bulk approve is the action a coordinator reaches for after reading a
+         *     morning's intake, so it is one request rather than a loop the browser
+         *     drives. Partial success is reported rather than hidden: `decided` counts
+         *     what moved, `skipped` names what did not and why.
+         */
+        post: operations["decideApplications"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/applications/{applicationId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve, waitlist or reject one application
+         * @description Approving creates the participation that puts someone on the roster.
+         *     The transition is one way in this slice: there is no un-approve, because
+         *     undoing it would have to decide what happens to a strand they may
+         *     already hold.
+         */
+        post: operations["decideApplication"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/form-versions/{formVersionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formVersionId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Read one form version by id
+         * @description An application stores the id of the version it was answered against, and
+         *     answers are keyed by field id. Reading a decided application back
+         *     therefore needs that exact version — not the current published one, which
+         *     may have moved on — or the answers are a map of uuids to values.
+         */
+        get: operations["getFormVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/unmatched": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** List everyone in the program with no strand */
+        get: operations["listUnmatched"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/runs": {
         parameters: {
             query?: never;
@@ -387,7 +500,13 @@ export interface paths {
         /** List the strands the current account holds in a program */
         get: operations["listStrands"];
         put?: never;
-        post?: never;
+        /**
+         * Pair two people by hand
+         * @description The remedy for most unmatched reasons. Stored with origin mode `manual`
+         *     so reports can answer whether the algorithm did better than the
+         *     coordinator's hand-picks, which is the whole reason origin mode exists.
+         */
+        post: operations["createStrand"];
         delete?: never;
         options?: never;
         head?: never;
@@ -710,6 +829,10 @@ export interface components {
             /** Format: date-time */
             submittedAt: string;
             /** Format: date-time */
+            decidedAt?: string | null;
+            /** @description The coordinator who decided it, for the audit log. */
+            decidedBy?: string | null;
+            /** Format: date-time */
             editableUntil?: string | null;
             /** Format: date-time */
             matchingOpensAt?: string | null;
@@ -780,6 +903,136 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        /**
+         * @description The review table's row. Deliberately not the whole Application: a
+         *     coordinator scanning a morning's intake does not need every answer
+         *     loaded, and the detail screen reads the full record when one is opened.
+         */
+        ApplicationSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            programId: string;
+            role: components["schemas"]["Role"];
+            name: string;
+            /** Format: email */
+            email: string;
+            status: components["schemas"]["ApplicationStatus"];
+            /** Format: date-time */
+            submittedAt: string;
+            /** Format: date-time */
+            decidedAt?: string | null;
+            decidedBy?: string | null;
+            /**
+             * @description Answered fields over askable ones, for the version this application
+             *     was answered against. A low figure is not a reason to reject; it is
+             *     a reason to read it first.
+             */
+            completeness: number;
+            /**
+             * @description Things worth a second look before deciding, named rather than
+             *     scored: an incomplete answer set, a duplicate email, an applicant
+             *     who has applied to this program before.
+             */
+            flags?: components["schemas"]["ApplicationFlag"][];
+        };
+        /** @enum {string} */
+        ApplicationFlag: "incomplete" | "duplicate_email" | "reapplied" | "over_subscribed_role";
+        ApplicationPage: {
+            items: components["schemas"]["ApplicationSummary"][];
+            page: number;
+            pageSize: number;
+            total: number;
+            counts: components["schemas"]["ApplicationCounts"];
+        };
+        /**
+         * @description The whole queue's shape, independent of the current filter, so the tabs
+         *     can carry counts without a request each.
+         */
+        ApplicationCounts: {
+            submitted: number;
+            under_review: number;
+            approved: number;
+            waitlisted: number;
+            rejected: number;
+        };
+        /** @enum {string} */
+        DecisionKind: "approve" | "waitlist" | "reject";
+        ApplicationDecision: {
+            decision: components["schemas"]["DecisionKind"];
+            /**
+             * @description Recorded against the decision for the audit log. Not sent to the
+             *     applicant; the message they receive comes from a template.
+             */
+            note?: string | null;
+        };
+        BulkDecision: {
+            applicationIds: string[];
+            decision: components["schemas"]["DecisionKind"];
+            note?: string | null;
+        };
+        BulkDecisionResult: {
+            decided: number;
+            skipped: components["schemas"]["SkippedDecision"][];
+        };
+        SkippedDecision: {
+            /** Format: uuid */
+            applicationId: string;
+            reason: string;
+        };
+        /**
+         * @description Every value here has a different remedy, which is why the queue stores a
+         *     code rather than a sentence. No capacity needs a mentor; no overlap
+         *     needs a different pool or a group; an incomplete profile needs the
+         *     participant, not the coordinator.
+         * @enum {string}
+         */
+        UnmatchedReason: "no_mentor_capacity" | "no_skill_overlap" | "joined_after_run" | "incomplete_profile" | "all_candidates_declined";
+        UnmatchedEntry: {
+            /** Format: uuid */
+            participationId: string;
+            name: string;
+            /** Format: email */
+            email?: string;
+            role: components["schemas"]["Role"];
+            reason: components["schemas"]["UnmatchedReason"];
+            profileCompleteness: number;
+            timezone?: string | null;
+            skills?: string[];
+            /** Format: date-time */
+            joinedAt: string;
+            /**
+             * Format: uuid
+             * @description The run that left them here, if any has been published.
+             */
+            lastRunId?: string | null;
+        };
+        UnmatchedPage: {
+            items: components["schemas"]["UnmatchedEntry"][];
+            page: number;
+            pageSize: number;
+            total: number;
+            /**
+             * @description Mentors with capacity to spare, so a manual pairing can be made
+             *     without leaving the queue to go and find one.
+             */
+            availableMentors: components["schemas"]["AvailableMentor"][];
+        };
+        AvailableMentor: {
+            /** Format: uuid */
+            participationId: string;
+            name: string;
+            load: number;
+            capacity: number;
+            skills?: string[];
+            timezone?: string | null;
+        };
+        StrandCreate: {
+            /** Format: uuid */
+            menteeParticipationId: string;
+            /** Format: uuid */
+            mentorParticipationId: string;
         };
         RosterPage: {
             items: components["schemas"]["RosterEntry"][];
@@ -1441,6 +1694,159 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    listApplications: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ApplicationStatus"];
+                role?: components["schemas"]["Role"];
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of applications */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    decideApplications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkDecision"];
+            };
+        };
+        responses: {
+            /** @description The outcome of each application in the request */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkDecisionResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    decideApplication: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                applicationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplicationDecision"];
+            };
+        };
+        responses: {
+            /** @description The application in its new state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Application"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The application has already been decided */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getFormVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                formVersionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The form version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listUnmatched: {
+        parameters: {
+            query?: {
+                reason?: components["schemas"]["UnmatchedReason"];
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of unmatched participants */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UnmatchedPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     listRuns: {
         parameters: {
             query?: {
@@ -1587,6 +1993,45 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    createStrand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrandCreate"];
+            };
+        };
+        responses: {
+            /** @description The strand, active immediately */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Strand"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description One of the two already holds a strand, or the mentor is full */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     getStrand: {

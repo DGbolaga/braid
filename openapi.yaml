@@ -31,8 +31,17 @@ tags:
     description: Screens scoped to one program, for the person in it.
   - name: Roster
     description: Approved participants in a program.
+  - name: Applications
+    description: |
+      Intake review. The queue between someone applying and appearing on the
+      roster, and the decision that moves them across.
   - name: Matching
     description: Batch runs, their fairness summaries, and publication.
+  - name: Unmatched
+    description: |
+      Everyone a run left without a strand, each with the reason why. Every
+      reason has a different remedy, which is why it is an enum and not a
+      message.
   - name: Strands
     description: Mentoring relationships and their message threads.
 
@@ -427,6 +436,176 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /programs/{programId}/applications:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listApplications
+      tags: [Applications]
+      summary: List applications submitted to a program
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ApplicationStatus"
+        - name: role
+          in: query
+          schema:
+            $ref: "#/components/schemas/Role"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of applications
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApplicationPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/applications/decisions:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    post:
+      operationId: decideApplications
+      tags: [Applications]
+      summary: Decide several applications at once
+      description: |
+        Bulk approve is the action a coordinator reaches for after reading a
+        morning's intake, so it is one request rather than a loop the browser
+        drives. Partial success is reported rather than hidden: `decided` counts
+        what moved, `skipped` names what did not and why.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkDecision"
+      responses:
+        "200":
+          description: The outcome of each application in the request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkDecisionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /applications/{applicationId}/decision:
+    parameters:
+      - name: applicationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: decideApplication
+      tags: [Applications]
+      summary: Approve, waitlist or reject one application
+      description: |
+        Approving creates the participation that puts someone on the roster.
+        The transition is one way in this slice: there is no un-approve, because
+        undoing it would have to decide what happens to a strand they may
+        already hold.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApplicationDecision"
+      responses:
+        "200":
+          description: The application in its new state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Application"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The application has already been decided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /form-versions/{formVersionId}:
+    parameters:
+      - name: formVersionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getFormVersion
+      tags: [Applications]
+      summary: Read one form version by id
+      description: |
+        An application stores the id of the version it was answered against, and
+        answers are keyed by field id. Reading a decided application back
+        therefore needs that exact version — not the current published one, which
+        may have moved on — or the answers are a map of uuids to values.
+      responses:
+        "200":
+          description: The form version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormVersion"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/unmatched:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listUnmatched
+      tags: [Unmatched]
+      summary: List everyone in the program with no strand
+      parameters:
+        - name: reason
+          in: query
+          schema:
+            $ref: "#/components/schemas/UnmatchedReason"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of unmatched participants
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UnmatchedPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /programs/{programId}/runs:
     parameters:
       - $ref: "#/components/parameters/ProgramId"
@@ -559,6 +738,41 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+    post:
+      operationId: createStrand
+      tags: [Unmatched]
+      summary: Pair two people by hand
+      description: |
+        The remedy for most unmatched reasons. Stored with origin mode `manual`
+        so reports can answer whether the algorithm did better than the
+        coordinator's hand-picks, which is the whole reason origin mode exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrandCreate"
+      responses:
+        "201":
+          description: The strand, active immediately
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strand"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: One of the two already holds a strand, or the mentor is full
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
 
   /strands/{strandId}:
     parameters:
@@ -1216,6 +1430,12 @@ components:
         submittedAt:
           type: string
           format: date-time
+        decidedAt:
+          type: [string, "null"]
+          format: date-time
+        decidedBy:
+          type: [string, "null"]
+          description: The coordinator who decided it, for the audit log.
         editableUntil:
           type: [string, "null"]
           format: date-time
@@ -1341,6 +1561,249 @@ components:
         joinedAt:
           type: string
           format: date-time
+
+    ApplicationSummary:
+      type: object
+      required:
+        [id, programId, role, name, email, status, submittedAt, completeness]
+      description: |
+        The review table's row. Deliberately not the whole Application: a
+        coordinator scanning a morning's intake does not need every answer
+        loaded, and the detail screen reads the full record when one is opened.
+      properties:
+        id:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        role:
+          $ref: "#/components/schemas/Role"
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        status:
+          $ref: "#/components/schemas/ApplicationStatus"
+        submittedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: [string, "null"]
+          format: date-time
+        decidedBy:
+          type: [string, "null"]
+        completeness:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: |
+            Answered fields over askable ones, for the version this application
+            was answered against. A low figure is not a reason to reject; it is
+            a reason to read it first.
+        flags:
+          type: array
+          description: |
+            Things worth a second look before deciding, named rather than
+            scored: an incomplete answer set, a duplicate email, an applicant
+            who has applied to this program before.
+          items:
+            $ref: "#/components/schemas/ApplicationFlag"
+
+    ApplicationFlag:
+      type: string
+      enum: [incomplete, duplicate_email, reapplied, over_subscribed_role]
+
+    ApplicationPage:
+      type: object
+      required: [items, page, pageSize, total, counts]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApplicationSummary"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        counts:
+          $ref: "#/components/schemas/ApplicationCounts"
+
+    ApplicationCounts:
+      type: object
+      required: [submitted, under_review, approved, waitlisted, rejected]
+      description: |
+        The whole queue's shape, independent of the current filter, so the tabs
+        can carry counts without a request each.
+      properties:
+        submitted:
+          type: integer
+        under_review:
+          type: integer
+        approved:
+          type: integer
+        waitlisted:
+          type: integer
+        rejected:
+          type: integer
+
+    DecisionKind:
+      type: string
+      enum: [approve, waitlist, reject]
+
+    ApplicationDecision:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          $ref: "#/components/schemas/DecisionKind"
+        note:
+          type: [string, "null"]
+          description: |
+            Recorded against the decision for the audit log. Not sent to the
+            applicant; the message they receive comes from a template.
+
+    BulkDecision:
+      type: object
+      required: [applicationIds, decision]
+      properties:
+        applicationIds:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+        decision:
+          $ref: "#/components/schemas/DecisionKind"
+        note:
+          type: [string, "null"]
+
+    BulkDecisionResult:
+      type: object
+      required: [decided, skipped]
+      properties:
+        decided:
+          type: integer
+        skipped:
+          type: array
+          items:
+            $ref: "#/components/schemas/SkippedDecision"
+
+    SkippedDecision:
+      type: object
+      required: [applicationId, reason]
+      properties:
+        applicationId:
+          type: string
+          format: uuid
+        reason:
+          type: string
+
+    UnmatchedReason:
+      type: string
+      description: |
+        Every value here has a different remedy, which is why the queue stores a
+        code rather than a sentence. No capacity needs a mentor; no overlap
+        needs a different pool or a group; an incomplete profile needs the
+        participant, not the coordinator.
+      enum:
+        [
+          no_mentor_capacity,
+          no_skill_overlap,
+          joined_after_run,
+          incomplete_profile,
+          all_candidates_declined,
+        ]
+
+    UnmatchedEntry:
+      type: object
+      required: [participationId, name, role, reason, profileCompleteness, joinedAt]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          $ref: "#/components/schemas/Role"
+        reason:
+          $ref: "#/components/schemas/UnmatchedReason"
+        profileCompleteness:
+          type: number
+          minimum: 0
+          maximum: 1
+        timezone:
+          type: [string, "null"]
+        skills:
+          type: array
+          items:
+            type: string
+        joinedAt:
+          type: string
+          format: date-time
+        lastRunId:
+          type: [string, "null"]
+          format: uuid
+          description: The run that left them here, if any has been published.
+
+    UnmatchedPage:
+      type: object
+      required: [items, page, pageSize, total, availableMentors]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnmatchedEntry"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        availableMentors:
+          type: array
+          description: |
+            Mentors with capacity to spare, so a manual pairing can be made
+            without leaving the queue to go and find one.
+          items:
+            $ref: "#/components/schemas/AvailableMentor"
+
+    AvailableMentor:
+      type: object
+      required: [participationId, name, load, capacity]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        load:
+          type: integer
+        capacity:
+          type: integer
+        skills:
+          type: array
+          items:
+            type: string
+        timezone:
+          type: [string, "null"]
+
+    StrandCreate:
+      type: object
+      required: [menteeParticipationId, mentorParticipationId]
+      properties:
+        menteeParticipationId:
+          type: string
+          format: uuid
+        mentorParticipationId:
+          type: string
+          format: uuid
 
     RosterPage:
       type: object

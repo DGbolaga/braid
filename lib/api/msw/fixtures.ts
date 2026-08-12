@@ -769,6 +769,117 @@ export function createDb() {
     },
   ];
 
+  /**
+   * The rest of the intake queue. Halima's application above carries a full
+   * answer set because the detail screen reads one; these carry enough to be
+   * reviewable and to give the queue every status it can hold.
+   *
+   * name, email, role, status, submitted days ago, answered field count
+   */
+  type AppSeed = [
+    string,
+    string,
+    S["Role"],
+    S["ApplicationStatus"],
+    number,
+    number,
+  ];
+
+  const APP_SEEDS: AppSeed[] = [
+    ["Chiamaka Eze", "chiamaka.eze@example.org", "mentee", "submitted", 1, 9],
+    ["Musa Danjuma", "musa.danjuma@example.org", "mentee", "submitted", 1, 5],
+    ["Rita Nwachukwu", "rita.nwachukwu@example.org", "mentor", "submitted", 3, 8],
+    ["Segun Adebayo", "segun.adebayo@example.org", "mentee", "under_review", 4, 10],
+    ["Blessing Adewale", "blessing.adewale@example.org", "mentee", "approved", 19, 10],
+    ["Ngozi Obi", "ngozi.obi@example.org", "mentee", "approved", 18, 10],
+    ["Yusuf Ibrahim", "yusuf.ibrahim@example.org", "mentee", "waitlisted", 12, 4],
+    ["Tunde Bakare", "tunde.bakare@example.org", "mentor", "approved", 40, 8],
+    ["Idris Lawal", "idris.lawal@example.org", "mentee", "rejected", 25, 6],
+  ];
+
+  // The askable fields, in order, so a seed's "answered count" fills a
+  // plausible prefix rather than a random scatter.
+  const MENTEE_FIELDS = [1, 2, 4, 5, 6, 7, 8, 9, 10, 12];
+  const MENTOR_FIELDS = [1, 2, 4, 5, 6, 7, 8, 12];
+
+  const seededAnswers = (role: S["Role"], count: number, days: number) => {
+    const ids = role === "mentor" ? MENTOR_FIELDS : MENTEE_FIELDS;
+    const answers: Record<string, S["AnswerRecord"]> = {};
+    for (const n of ids.slice(0, count)) {
+      answers[field(n)] = answered("Answered", "self", days);
+    }
+    return answers;
+  };
+
+  const seededApplications: S["Application"][] = APP_SEEDS.map(
+    ([name, email, role, status, days, answeredCount], i) => ({
+      id: uuid(5, i + 2),
+      programId: PROGRAM,
+      programName: program.name,
+      role,
+      name,
+      email,
+      status,
+      submittedAt: daysAgo(days),
+      editableUntil: daysAhead(21),
+      matchingOpensAt: daysAhead(37),
+      formVersionId: role === "mentor" ? mentorForm.id : menteeForm.id,
+      answers: seededAnswers(role, answeredCount, days),
+    }),
+  );
+
+  applications.push(...seededApplications);
+
+  /**
+   * Everyone in the programme with no strand. Derived rather than written out,
+   * so it cannot drift from the roster it is a view of: any mentee the run did
+   * not place, plus any mentor holding nothing.
+   *
+   * The reasons are assigned per person because each one has a different
+   * remedy, and a queue where every row says the same thing is a queue nobody
+   * reads.
+   */
+  const REASONS: Record<string, S["UnmatchedReason"]> = {
+    "Yusuf Ibrahim": "incomplete_profile",
+    "Lerato Molefe": "no_mentor_capacity",
+    "Samuel Adeyemi": "no_skill_overlap",
+  };
+
+  const unmatchedMentees = menteeEntries
+    .filter((e) => !e.matched)
+    .map((e) => ({
+      participationId: e.id,
+      name: e.account.name,
+      email: e.account.email,
+      role: e.role,
+      reason: REASONS[e.account.name] ?? "no_mentor_capacity",
+      profileCompleteness: e.profileCompleteness,
+      timezone: e.timezone,
+      skills: menteeSkills(MENTEES.findIndex((m) => m[0] === e.account.name)),
+      joinedAt: e.joinedAt,
+      lastRunId: uuid(6, 1),
+    }));
+
+  const unmatchedMentors = mentorEntries
+    .filter((e) => (e.load ?? 0) === 0)
+    .map((e) => ({
+      participationId: e.id,
+      name: e.account.name,
+      email: e.account.email,
+      role: e.role,
+      reason: REASONS[e.account.name] ?? "no_skill_overlap",
+      profileCompleteness: e.profileCompleteness,
+      timezone: e.timezone,
+      skills: mentorSkills(MENTORS.findIndex((m) => m[0] === e.account.name)),
+      joinedAt: e.joinedAt,
+      lastRunId: uuid(6, 1),
+    }));
+
+  const unmatched: S["UnmatchedEntry"][] = [
+    ...unmatchedMentees,
+    ...unmatchedMentors,
+  ];
+
   const session: S["Session"] = {
     account: me.account,
     participations: [
@@ -809,6 +920,7 @@ export function createDb() {
     strandSummaries: summaries,
     messages,
     applications,
+    unmatched,
     home,
     formVersions: FORM_VERSIONS,
     drafts: [] as S["ApplicationDraft"][],
