@@ -102,7 +102,22 @@ Do not skip ahead. Each step is one commit.
 4. ✅ `ui/` primitives: button, input, table, empty state
 5. ✅ Strand card, 1:1 and group variants
 6. ✅ Dynamic form renderer
-7. Slice screens: landing and apply are done; home and strand detail are current
-8. Admin slice: roster, run review
+7. ✅ Slice screens: landing, apply, home, strand detail, plus sign in, verify,
+   the application confirmation and the strands list — the flow has a door now
+8. ✅ Admin slice: roster, matching runs, run review with publish
 
 Match reveal is last. It pays off a product that has to exist first.
+
+**Not built, and why.** Directory, resources, profile, invite, and the other
+thirteen admin screens have no endpoints in `openapi.yaml`. Adding them means
+contract first, then `npm run gen:api`, then a handler, then the screen. Sign in
+has no password path and the run review has no swap, lock, reject or re-run for
+the same reason.
+
+**One trap worth knowing.** MSW runs in two places with two copies of the
+fixtures, so anything created at runtime exists on one side only. A client
+mutation followed by a server-rendered read returns 404 in development and works
+in production, which is the worst way for a bug to behave. Keep each flow's
+write and read on the same side: submitting an application is a server action
+because its confirmation is server-rendered, and the run review reads in the
+browser because it polls and publishes there.
