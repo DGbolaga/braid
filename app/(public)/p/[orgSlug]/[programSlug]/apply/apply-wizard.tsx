@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { components } from "@/lib/api/types";
 import { api } from "@/lib/api/client";
@@ -57,10 +58,13 @@ export function ApplyWizard({
   orgSlug: string;
   programSlug: string;
 }) {
+  const router = useRouter();
   const desktop = useIsDesktop();
   const form = useAnswerForm({ version });
   const [index, setIndex] = useState(0);
-  const [submitted, setSubmitted] = useState<S["Application"] | null>(null);
+  // Stays true through the navigation to /applied, so the submit button does
+  // not flip back to idle while the confirmation route is still loading.
+  const [leaving, setLeaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | undefined>();
   const [contact, setContact] = useState({ name: "", email: "" });
   const [contactErrors, setContactErrors] = useState<{ name?: string; email?: string }>({});
@@ -168,18 +172,11 @@ export function ApplyWizard({
       return;
     }
     draft.clear();
-    setSubmitted(data);
+    // replace, not push: back from the confirmation must not re-enter a form
+    // that has already been submitted.
+    setLeaving(true);
+    router.replace(`/p/${orgSlug}/${programSlug}/applied?id=${data.id}`);
   };
-
-  if (submitted) {
-    return (
-      <Submitted
-        application={submitted}
-        programName={programName}
-        back={`/p/${orgSlug}/${programSlug}`}
-      />
-    );
-  }
 
   return (
     <>
@@ -243,7 +240,7 @@ export function ApplyWizard({
             <Button
               size="lg"
               onClick={onSubmit}
-              loading={form.isSubmitting}
+              loading={form.isSubmitting || leaving}
               loadingLabel="Sending your application"
             >
               Send my application
@@ -396,42 +393,6 @@ function SaveState({ draft }: { draft: ReturnType<typeof useDraft> }) {
           ? "Not saved"
           : ""}
     </span>
-  );
-}
-
-function Submitted({
-  application,
-  programName,
-  back,
-}: {
-  application: S["Application"];
-  programName: string;
-  back: string;
-}) {
-  return (
-    <>
-      <PublicHeader />
-      <PublicMain className="flex flex-col gap-24">
-        <h1 className="type-heading-l text-primary">
-          Your application is in.
-        </h1>
-        <p className="type-body-l text-secondary">
-          {programName} has it. We sent a copy to {application.email}.
-          {application.matchingOpensAt
-            ? ` Matching runs on ${new Intl.DateTimeFormat("en-GB", {
-                day: "numeric",
-                month: "long",
-                timeZone: "UTC",
-              }).format(new Date(application.matchingOpensAt))}, and you will hear either way.`
-            : " You will hear either way."}
-        </p>
-        <div className="flex">
-          <Link href={back} className="type-body-m text-link underline">
-            Back to the programme
-          </Link>
-        </div>
-      </PublicMain>
-    </>
   );
 }
 
