@@ -726,6 +726,67 @@ export const handlers = [
     return HttpResponse.json(full);
   }),
 
+  http.get(url("/programs/:programId/report"), ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const q = new URL(request.url).searchParams;
+    const from = q.get("from");
+    const to = q.get("to");
+
+    // The range narrows the series rather than regenerating them, which is
+    // what a real query would do and keeps the totals honest against it.
+    const within = (date: string) =>
+      (!from || date >= from) && (!to || date <= to);
+
+    const body: S["ProgramReport"] = {
+      ...db.report,
+      from: from ?? db.report.from,
+      to: to ?? db.report.to,
+      coverageOverTime: db.report.coverageOverTime.filter((p) =>
+        within(p.date),
+      ),
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(url("/orgs/:orgSlug/audit"), ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.orgSlug !== ORG_SLUG) return notFound("organisation");
+
+    const q = new URL(request.url).searchParams;
+    const actor = q.get("actor");
+    const action = q.get("action");
+    const from = q.get("from");
+    const to = q.get("to");
+    const page = Number(q.get("page") ?? 1);
+    const pageSize = Number(q.get("pageSize") ?? 50);
+
+    const filtered = db.auditEvents.filter((e) => {
+      if (actor && e.actorName !== actor) return false;
+      if (action && e.action !== action) return false;
+      const day = e.at.slice(0, 10);
+      if (from && day < from) return false;
+      if (to && day > to) return false;
+      return true;
+    });
+
+    const ordered = [...filtered].sort((a, b) => b.at.localeCompare(a.at));
+
+    const body: S["AuditPage"] = {
+      items: ordered.slice((page - 1) * pageSize, page * pageSize),
+      page,
+      pageSize,
+      total: ordered.length,
+      // Every actor in the whole log, not just this page, or the filter would
+      // lose the option that produced the current view.
+      actors: [...new Set(db.auditEvents.map((e) => e.actorName))].sort(),
+    };
+    return HttpResponse.json(body);
+  }),
+
   http.get(url("/programs/:programId/criteria"), ({ params }) => {
     const denied = requireSession();
     if (denied) return denied;

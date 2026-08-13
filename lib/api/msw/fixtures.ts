@@ -1080,6 +1080,155 @@ export function createDb() {
     },
   ];
 
+  /**
+   * The audit trail. Every entry is a deviation from, or a decision about, the
+   * algorithm — which is what makes the fairness claim checkable by somebody
+   * who was not in the room.
+   */
+  const auditEvents: S["AuditEvent"][] = [
+    {
+      id: uuid(15, 1),
+      at: daysAgo(2),
+      actorName: "Amara Okonkwo",
+      action: "application_decided",
+      summary: "Approved Halima Sani onto the roster as a mentee.",
+      subjectLabel: "Halima Sani",
+    },
+    {
+      id: uuid(15, 2),
+      at: daysAgo(4),
+      actorName: "Amara Okonkwo",
+      action: "manual_pairing",
+      summary:
+        "Paired Joy Achieng with Priya Raghunathan by hand, outside the run.",
+      subjectLabel: "Joy Achieng and Priya Raghunathan",
+    },
+    {
+      id: uuid(15, 3),
+      at: daysAgo(6),
+      actorName: "Ngozi Adeyemi",
+      action: "data_exported",
+      summary: "Exported the roster as CSV, 24 rows including email addresses.",
+      subjectLabel: "Roster export",
+    },
+    {
+      id: uuid(15, 4),
+      at: daysAgo(9),
+      actorName: "Amara Okonkwo",
+      action: "criteria_saved",
+      summary:
+        "Changed the matching recipe: raised the weight on what a mentee wants to work on from 70 to 90.",
+      subjectLabel: "Cohort 4 recipe, version 4",
+    },
+    {
+      id: uuid(15, 5),
+      at: daysAgo(15),
+      actorName: "Amara Okonkwo",
+      action: "run_published",
+      summary: "Published a run of 14 pairs. Two mentees were left unmatched.",
+      subjectLabel: "Run of 24 July",
+    },
+    {
+      id: uuid(15, 6),
+      at: daysAgo(16),
+      actorName: "Ngozi Adeyemi",
+      action: "pair_overridden",
+      summary:
+        "Replaced the proposed mentor for Aisha Bello before publishing, from Samuel Adeyemi to Chidinma Eze.",
+      subjectLabel: "Aisha Bello",
+    },
+    {
+      id: uuid(15, 7),
+      at: daysAgo(22),
+      actorName: "Amara Okonkwo",
+      action: "form_published",
+      summary: "Published version 3 of the mentee form, adding two questions.",
+      subjectLabel: "Mentee form, version 3",
+    },
+    {
+      id: uuid(15, 8),
+      at: daysAgo(30),
+      actorName: "Ngozi Adeyemi",
+      action: "participant_edited",
+      summary:
+        "Edited Fatima Yusuf's availability on her behalf, after she emailed asking.",
+      subjectLabel: "Fatima Yusuf",
+    },
+  ];
+
+  /**
+   * The report. Coverage climbs as intake and matching proceed; sessions dip
+   * over the December weeks, which is the shape every real programme has and
+   * the thing a funder asks about.
+   */
+  const report: S["ProgramReport"] = {
+    programName: program.name,
+    from: "2026-06-01",
+    to: "2026-08-08",
+    coverageOverTime: [
+      { date: "2026-06-08", value: 0 },
+      { date: "2026-06-22", value: 0.12 },
+      { date: "2026-07-06", value: 0.34 },
+      { date: "2026-07-20", value: 0.63 },
+      { date: "2026-08-03", value: 0.88 },
+    ],
+    mentorLoad: fairnessSummary.mentorLoad,
+    qualityByBand: fairnessSummary.priorityBands,
+    sessionsByWeek: [
+      { label: "w/c 29 Jun", count: 2 },
+      { label: "w/c 6 Jul", count: 6 },
+      { label: "w/c 13 Jul", count: 9 },
+      { label: "w/c 20 Jul", count: 7 },
+      { label: "w/c 27 Jul", count: 11 },
+      { label: "w/c 3 Aug", count: 8 },
+    ],
+    checkInSentiment: [
+      { label: "1", count: 0 },
+      { label: "2", count: 1 },
+      { label: "3", count: 3 },
+      { label: "4", count: 7 },
+      { label: "5", count: 5 },
+    ],
+    checkInResponseRate: 0.64,
+    milestoneCompletion: [
+      { title: "First conversation", completed: 12, total: 14 },
+      { title: "Goals agreed", completed: 8, total: 14 },
+      { title: "Halfway review", completed: 3, total: 14 },
+    ],
+    dropOff: [
+      { stage: "applied", count: 31 },
+      { stage: "approved", count: 24 },
+      { stage: "matched", count: 14 },
+      { stage: "first_message", count: 13 },
+      { stage: "first_session", count: 11 },
+      { stage: "still_active", count: 10 },
+    ],
+    // Only questions participants agreed to share. The years-of-experience
+    // band has a bucket of one, which is withheld rather than shown.
+    demographics: [
+      {
+        fieldId: field(4),
+        label: "Years writing code",
+        buckets: [
+          { label: "Under 1", count: 5 },
+          { label: "1 to 2", count: 7 },
+          { label: "3 to 5", count: 4 },
+        ],
+        suppressedBuckets: 1,
+      },
+      {
+        fieldId: field(5),
+        label: "Mentored before",
+        buckets: [
+          { label: "No", count: 11 },
+          { label: "Yes", count: 5 },
+        ],
+        suppressedBuckets: 0,
+      },
+    ],
+    suppressionThreshold: 3,
+  };
+
   const session: S["Session"] = {
     account: me.account,
     participations: [
@@ -1124,6 +1273,8 @@ export function createDb() {
     milestones,
     recipe,
     broadcasts,
+    auditEvents,
+    report,
     strandMetrics: metrics,
     /** Structured clone so resetting a template can restore untouched text. */
     templates: DEFAULT_TEMPLATES.map((t) => ({ ...t })),

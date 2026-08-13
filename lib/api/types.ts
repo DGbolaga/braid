@@ -395,6 +395,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** The programme's outcomes over a date range */
+        get: operations["getReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/orgs/{orgSlug}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Who changed what, and when
+         * @description The fairness claim is only inspectable if the deviations from the
+         *     algorithm are recorded. This is that record: criteria edits, form
+         *     versions, run publications, manual pairings, decisions on applications,
+         *     and every export of participant data.
+         */
+        get: operations["listAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/criteria": {
         parameters: {
             query?: never;
@@ -1214,6 +1258,89 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        TimePoint: {
+            /** Format: date */
+            date: string;
+            value: number;
+        };
+        CountPoint: {
+            label: string;
+            count: number;
+        };
+        MilestoneCompletion: {
+            title: string;
+            completed: number;
+            total: number;
+        };
+        /**
+         * @description The funnel from applying to still meeting. Reported as counts at each
+         *     stage rather than as a single retention figure, because where people
+         *     leave is the thing a programme can act on.
+         */
+        DropOffStage: {
+            /** @enum {string} */
+            stage: "applied" | "approved" | "matched" | "first_message" | "first_session" | "still_active";
+            count: number;
+        };
+        /**
+         * @description Only fields participants consented to share are ever returned. Buckets
+         *     smaller than the suppression threshold are withheld rather than
+         *     rounded: in a cohort of twenty, "one person" plus any other column is
+         *     an identification.
+         */
+        DemographicBreakdown: {
+            /** Format: uuid */
+            fieldId: string;
+            label: string;
+            buckets: components["schemas"]["CountPoint"][];
+            /** @description How many buckets were withheld as too small to report. */
+            suppressedBuckets: number;
+        };
+        ProgramReport: {
+            programName: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            coverageOverTime: components["schemas"]["TimePoint"][];
+            mentorLoad: components["schemas"]["MentorLoad"][];
+            qualityByBand: components["schemas"]["PriorityBandStat"][];
+            sessionsByWeek: components["schemas"]["CountPoint"][];
+            /** @description Responses at each point on the scale. */
+            checkInSentiment: components["schemas"]["CountPoint"][];
+            checkInResponseRate?: number | null;
+            milestoneCompletion: components["schemas"]["MilestoneCompletion"][];
+            dropOff: components["schemas"]["DropOffStage"][];
+            demographics: components["schemas"]["DemographicBreakdown"][];
+            /** @description Buckets at or below this size are withheld. */
+            suppressionThreshold: number;
+        };
+        /** @enum {string} */
+        AuditAction: "criteria_saved" | "form_published" | "run_published" | "pair_overridden" | "manual_pairing" | "application_decided" | "participant_edited" | "strand_ended" | "broadcast_sent" | "template_edited" | "data_exported";
+        AuditEvent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            at: string;
+            actorName: string;
+            action: components["schemas"]["AuditAction"];
+            /**
+             * @description Written server-side and in plain words. An audit line that needs the
+             *     reader to know the schema is not inspectable by the people it exists
+             *     for.
+             */
+            summary: string;
+            /** @description What was changed, named the way a person would name it. */
+            subjectLabel?: string | null;
+        };
+        AuditPage: {
+            items: components["schemas"]["AuditEvent"][];
+            page: number;
+            pageSize: number;
+            total: number;
+            /** @description Everyone who appears in the log, for the filter. */
+            actors: string[];
         };
         /**
          * @description A pair that fails an enabled constraint is never proposed, whatever it
@@ -2434,6 +2561,66 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getReport: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgramReport"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listAuditEvents: {
+        parameters: {
+            query?: {
+                actor?: string;
+                action?: components["schemas"]["AuditAction"];
+                from?: string;
+                to?: string;
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path: {
+                orgSlug: components["parameters"]["OrgSlug"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of events, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getCriteria: {

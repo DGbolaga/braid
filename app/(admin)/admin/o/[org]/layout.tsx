@@ -29,7 +29,9 @@ export default async function AdminLayout({
         programmes={result.programmes}
         current={result.programmes[0]}
       />
-      <main className="min-w-0 flex-1 overflow-x-auto px-32 py-32">
+      {/* On paper the content is the page: no sidebar beside it, no gutter
+          held open for one, and no horizontal scroll container. */}
+      <main className="min-w-0 flex-1 overflow-x-auto px-32 py-32 print:overflow-visible print:p-0">
         <div className="mx-auto max-w-coordinator">{children}</div>
       </main>
     </div>

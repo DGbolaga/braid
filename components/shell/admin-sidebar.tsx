@@ -29,7 +29,9 @@ export function AdminSidebar({
   const groups = adminNav(current.orgSlug, programId);
 
   return (
-    <div className="flex w-sidebar shrink-0 flex-col gap-24 overflow-y-auto border-r border-subtle bg-surface px-16 py-16">
+    // Dropped when printing, per architecture 7: the one deliverable that gets
+    // printed is the report, and navigation on paper is furniture.
+    <div className="flex w-sidebar shrink-0 flex-col gap-24 overflow-y-auto border-r border-subtle bg-surface px-16 py-16 print:hidden">
       <div className="flex items-center justify-between gap-8">
         <span className="flex min-w-0 items-center gap-8">
           <WeaveMark size={32} id="admin-mark" />

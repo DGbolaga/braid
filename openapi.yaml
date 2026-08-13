@@ -46,6 +46,10 @@ tags:
     description: |
       What a coordinator configures before a cohort runs: the programme arc and
       the messages it sends.
+  - name: Insight
+    description: |
+      The report a coordinator sends a funder, and the log that makes its
+      fairness claim inspectable.
   - name: Comms
     description: Messages sent to a segment of the programme at once.
   - name: Monitoring
@@ -569,6 +573,85 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Problem"
+
+  /programs/{programId}/report:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: getReport
+      tags: [Insight]
+      summary: The programme's outcomes over a date range
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProgramReport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /orgs/{orgSlug}/audit:
+    parameters:
+      - $ref: "#/components/parameters/OrgSlug"
+    get:
+      operationId: listAuditEvents
+      tags: [Insight]
+      summary: Who changed what, and when
+      description: |
+        The fairness claim is only inspectable if the deviations from the
+        algorithm are recorded. This is that record: criteria edits, form
+        versions, run publications, manual pairings, decisions on applications,
+        and every export of participant data.
+      parameters:
+        - name: actor
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            $ref: "#/components/schemas/AuditAction"
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of events, newest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /programs/{programId}/criteria:
     parameters:
@@ -2082,6 +2165,208 @@ components:
         joinedAt:
           type: string
           format: date-time
+
+    TimePoint:
+      type: object
+      required: [date, value]
+      properties:
+        date:
+          type: string
+          format: date
+        value:
+          type: number
+
+    CountPoint:
+      type: object
+      required: [label, count]
+      properties:
+        label:
+          type: string
+        count:
+          type: integer
+
+    MilestoneCompletion:
+      type: object
+      required: [title, completed, total]
+      properties:
+        title:
+          type: string
+        completed:
+          type: integer
+        total:
+          type: integer
+
+    DropOffStage:
+      type: object
+      required: [stage, count]
+      description: |
+        The funnel from applying to still meeting. Reported as counts at each
+        stage rather than as a single retention figure, because where people
+        leave is the thing a programme can act on.
+      properties:
+        stage:
+          type: string
+          enum:
+            [
+              applied,
+              approved,
+              matched,
+              first_message,
+              first_session,
+              still_active,
+            ]
+        count:
+          type: integer
+
+    DemographicBreakdown:
+      type: object
+      required: [fieldId, label, buckets, suppressedBuckets]
+      description: |
+        Only fields participants consented to share are ever returned. Buckets
+        smaller than the suppression threshold are withheld rather than
+        rounded: in a cohort of twenty, "one person" plus any other column is
+        an identification.
+      properties:
+        fieldId:
+          type: string
+          format: uuid
+        label:
+          type: string
+        buckets:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountPoint"
+        suppressedBuckets:
+          type: integer
+          description: How many buckets were withheld as too small to report.
+
+    ProgramReport:
+      type: object
+      required:
+        [
+          programName,
+          from,
+          to,
+          coverageOverTime,
+          mentorLoad,
+          qualityByBand,
+          sessionsByWeek,
+          checkInSentiment,
+          milestoneCompletion,
+          dropOff,
+          demographics,
+          suppressionThreshold,
+        ]
+      properties:
+        programName:
+          type: string
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        coverageOverTime:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimePoint"
+        mentorLoad:
+          type: array
+          items:
+            $ref: "#/components/schemas/MentorLoad"
+        qualityByBand:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriorityBandStat"
+        sessionsByWeek:
+          type: array
+          items:
+            $ref: "#/components/schemas/CountPoint"
+        checkInSentiment:
+          type: array
+          description: Responses at each point on the scale.
+          items:
+            $ref: "#/components/schemas/CountPoint"
+        checkInResponseRate:
+          type: [number, "null"]
+          minimum: 0
+          maximum: 1
+        milestoneCompletion:
+          type: array
+          items:
+            $ref: "#/components/schemas/MilestoneCompletion"
+        dropOff:
+          type: array
+          items:
+            $ref: "#/components/schemas/DropOffStage"
+        demographics:
+          type: array
+          items:
+            $ref: "#/components/schemas/DemographicBreakdown"
+        suppressionThreshold:
+          type: integer
+          description: Buckets at or below this size are withheld.
+
+    AuditAction:
+      type: string
+      enum:
+        [
+          criteria_saved,
+          form_published,
+          run_published,
+          pair_overridden,
+          manual_pairing,
+          application_decided,
+          participant_edited,
+          strand_ended,
+          broadcast_sent,
+          template_edited,
+          data_exported,
+        ]
+
+    AuditEvent:
+      type: object
+      required: [id, at, actorName, action, summary]
+      properties:
+        id:
+          type: string
+          format: uuid
+        at:
+          type: string
+          format: date-time
+        actorName:
+          type: string
+        action:
+          $ref: "#/components/schemas/AuditAction"
+        summary:
+          type: string
+          description: |
+            Written server-side and in plain words. An audit line that needs the
+            reader to know the schema is not inspectable by the people it exists
+            for.
+        subjectLabel:
+          type: [string, "null"]
+          description: What was changed, named the way a person would name it.
+
+    AuditPage:
+      type: object
+      required: [items, page, pageSize, total, actors]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        actors:
+          type: array
+          description: Everyone who appears in the log, for the filter.
+          items:
+            type: string
 
     HardConstraintKind:
       type: string
