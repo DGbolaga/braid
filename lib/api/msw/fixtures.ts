@@ -1229,6 +1229,83 @@ export function createDb() {
     suppressionThreshold: 3,
   };
 
+  const resources: S["Resource"][] = [
+    {
+      id: uuid(16, 1),
+      title: "Programme handbook",
+      description:
+        "How the six months are structured, what each milestone means, and who to ask when something is not working.",
+      kind: "handbook",
+      url: "/resources/handbook.pdf",
+      sizeBytes: 1_240_000,
+      updatedAt: daysAgo(30),
+    },
+    {
+      id: uuid(16, 2),
+      title: "What mentors are expected to do",
+      description:
+        "Two hours a month, and what those two hours should contain. Written to be read before the first conversation.",
+      kind: "expectations",
+      url: "/resources/mentor-expectations.pdf",
+      sizeBytes: 320_000,
+      updatedAt: daysAgo(30),
+    },
+    {
+      id: uuid(16, 3),
+      title: "What mentees are expected to do",
+      description:
+        "Turning up prepared, and what preparing actually means when you do not yet know what to ask.",
+      kind: "expectations",
+      url: "/resources/mentee-expectations.pdf",
+      sizeBytes: 298_000,
+      updatedAt: daysAgo(30),
+    },
+    {
+      id: uuid(16, 4),
+      title: "Conversation starters",
+      description:
+        "Thirty questions for when a session stalls. Most pairs use these twice and never need them again.",
+      kind: "conversation_starters",
+      url: "/resources/conversation-starters.pdf",
+      sizeBytes: 180_000,
+      updatedAt: daysAgo(21),
+    },
+    {
+      id: uuid(16, 5),
+      title: "Code of conduct",
+      description:
+        "What is expected of everyone here, and how to report something that is not right.",
+      kind: "code_of_conduct",
+      url: "/resources/code-of-conduct.pdf",
+      sizeBytes: 96_000,
+      updatedAt: daysAgo(60),
+    },
+  ];
+
+  /**
+   * The current account's own answers in this programme. Keyed by field id on
+   * the mentor form, because the seeded session is a mentor here.
+   */
+  const myAnswers: Record<string, S["AnswerRecord"]> = {
+    [field(20)]: answered("Amara", "self", 55),
+    [field(21)]: answered(
+      "I lead the payments platform team. Mostly Python and Django, and a lot of arguing about API design.",
+      "self",
+      55,
+    ),
+    // Focus areas: System design and Testing. Not the capacity options, which
+    // start at 30 and belong to field 23.
+    [field(22)]: answered([option(11), option(12)], "self", 55),
+    // Flagged `admin` on the mentor form, so this must never reach a public
+    // profile — the fixture carries one precisely so that can be checked.
+    [field(23)]: answered(option(32), "self", 55),
+    [field(24)]: answered(
+      "I started as a self-taught developer writing PHP for a shop in Surulere. Nobody told me what a code review was for two years.",
+      "self",
+      55,
+    ),
+  };
+
   const session: S["Session"] = {
     account: me.account,
     participations: [
@@ -1275,6 +1352,10 @@ export function createDb() {
     broadcasts,
     auditEvents,
     report,
+    resources,
+    myAnswers,
+    /** Architecture 4.9: the directory only exists when this is on. */
+    selfMatchingEnabled: true,
     strandMetrics: metrics,
     /** Structured clone so resetting a template can restore untouched text. */
     templates: DEFAULT_TEMPLATES.map((t) => ({ ...t })),

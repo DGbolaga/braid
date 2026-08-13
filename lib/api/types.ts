@@ -395,6 +395,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The profile the current account holds in this programme
+         * @description A profile is the application answers, read back against the form version
+         *     they were given on. There is no second shape for a profile: inventing
+         *     one would mean a coordinator's question could be asked and then never
+         *     seen again.
+         */
+        get: operations["getMyProfile"];
+        /**
+         * Save answers to the profile
+         * @description Partial: only the answers sent are written, so a per-section save cannot
+         *     blank the sections that were not on screen.
+         */
+        put: operations["saveMyProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/directory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Participants a member may browse
+         * @description Filtered to the opposite role. Mentors at capacity are listed as
+         *     unavailable rather than hidden, per architecture 4.9, so the scarcity
+         *     is visible instead of looking like an empty directory.
+         */
+        get: operations["listDirectory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/participations/{participationId}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participationId: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * One participant as other participants see them
+         * @description Answers to questions flagged `admin` are never included. Those are
+         *     collected for the coordinator, and a profile screen is the easiest place
+         *     to leak them by accident.
+         */
+        get: operations["getPublicProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** What the coordinator has published for participants to read */
+        get: operations["listResources"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/report": {
         parameters: {
             query?: never;
@@ -1258,6 +1355,100 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        ProfileView: {
+            /** Format: uuid */
+            participationId: string;
+            name: string;
+            role: components["schemas"]["Role"];
+            /** Format: uri */
+            photoUrl?: string | null;
+            headline?: string | null;
+            timezone?: string | null;
+            completeness: number;
+            formVersion: components["schemas"]["FormVersion"];
+            answers: {
+                [key: string]: components["schemas"]["AnswerRecord"];
+            };
+            /**
+             * @description Unanswered, or answered so briefly there is nothing to match on.
+             *     What guided completion would ask about next.
+             */
+            thinFieldIds: string[];
+        };
+        ProfileSave: {
+            /** @description Only the fields being saved. Absent fields are left alone. */
+            answers: {
+                [key: string]: components["schemas"]["AnswerInput"];
+            };
+        };
+        DirectoryEntry: {
+            /** Format: uuid */
+            participationId: string;
+            name: string;
+            role: components["schemas"]["Role"];
+            photoUrl?: string | null;
+            headline?: string | null;
+            timezone?: string | null;
+            skills: string[];
+            /**
+             * @description False for a mentor already at the capacity they set. Shown rather
+             *     than filtered out, so a member can see that the shortage is real.
+             */
+            available: boolean;
+            unavailableReason?: string | null;
+        };
+        DirectoryPage: {
+            items: components["schemas"]["DirectoryEntry"][];
+            page: number;
+            pageSize: number;
+            total: number;
+            /**
+             * @description The directory only exists when the coordinator turned self-matching
+             *     on. False is a real state, not an error.
+             */
+            selfMatchingEnabled: boolean;
+            /** @description Every skill in the browsable set, for the filter. */
+            skills: string[];
+        };
+        PublicProfile: {
+            /** Format: uuid */
+            participationId: string;
+            name: string;
+            role: components["schemas"]["Role"];
+            photoUrl?: string | null;
+            headline?: string | null;
+            timezone?: string | null;
+            skills: string[];
+            available: boolean;
+            capacity?: number | null;
+            load?: number | null;
+            /**
+             * @description Shareable answers only, already grouped and labelled. Questions
+             *     flagged `admin` never appear.
+             */
+            sections: components["schemas"]["PublicProfileSection"][];
+        };
+        PublicProfileSection: {
+            title: string;
+            entries: components["schemas"]["PublicProfileEntry"][];
+        };
+        PublicProfileEntry: {
+            label: string;
+            value: string;
+        };
+        /** @enum {string} */
+        ResourceKind: "handbook" | "expectations" | "conversation_starters" | "code_of_conduct" | "other";
+        Resource: {
+            /** Format: uuid */
+            id: string;
+            title: string;
+            description?: string | null;
+            kind: components["schemas"]["ResourceKind"];
+            url: string;
+            sizeBytes?: number | null;
+            /** Format: date-time */
+            updatedAt?: string | null;
         };
         TimePoint: {
             /** Format: date */
@@ -2561,6 +2752,141 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getMyProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveMyProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileSave"];
+            };
+        };
+        responses: {
+            /** @description The profile as saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listDirectory: {
+        parameters: {
+            query?: {
+                q?: string;
+                skill?: string;
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The directory */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getPublicProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The public profile */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicProfile"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listResources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The resources */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Resource"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getReport: {

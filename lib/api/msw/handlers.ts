@@ -20,6 +20,99 @@ const requireSession = () => (db.signedIn ? null : unauthorized());
 const nextId = (kind: number) =>
   `${String(kind).padStart(8, "0")}-0000-4000-8000-${String(++db.seq).padStart(12, "0")}`;
 
+/** The strand member record is where skills and headline already live. */
+const memberFor = (participationId: string) =>
+  db.strands
+    .flatMap((s) => s.members)
+    .find((m) => m.participationId === participationId);
+
+const skillsFor = (entry: S["RosterEntry"]) =>
+  memberFor(entry.id)?.skills ?? [];
+const headlineFor = (entry: S["RosterEntry"]) =>
+  memberFor(entry.id)?.headline ?? null;
+
+/**
+ * An answer thin enough that there is nothing to match on. Guided completion
+ * exists for exactly these, so the profile screen names them rather than
+ * showing a bare percentage.
+ */
+const THIN_TEXT_LENGTH = 40;
+
+function isThin(field: S["FormField"], record: S["AnswerRecord"] | undefined) {
+  if (!record) return true;
+  const value = record.value;
+  if (typeof value === "string") {
+    return field.type === "long_text"
+      ? value.trim().length < THIN_TEXT_LENGTH
+      : value.trim().length === 0;
+  }
+  if (Array.isArray(value)) return value.length === 0;
+  return value === null || value === undefined;
+}
+
+function myProfile(): S["ProfileView"] {
+  const participation = db.session.participations[0];
+  const version =
+    publishedVersion(participation.role) ??
+    db.formVersions.find((v) => v.role === participation.role)!;
+  const fields = version.sections.flatMap((s) => s.fields);
+  const answered = fields.filter((f) => !isThin(f, db.myAnswers[f.id]));
+  const entry = db.roster.find((r) => r.id === participation.id);
+
+  return {
+    participationId: participation.id,
+    name: db.session.account.name,
+    role: participation.role,
+    photoUrl: null,
+    headline: entry ? headlineFor(entry) : null,
+    timezone: entry?.timezone ?? null,
+    completeness:
+      fields.length === 0
+        ? 1
+        : Number((answered.length / fields.length).toFixed(3)),
+    formVersion: version,
+    answers: db.myAnswers,
+    thinFieldIds: fields
+      .filter((f) => isThin(f, db.myAnswers[f.id]))
+      .map((f) => f.id),
+  };
+}
+
+/**
+ * The current account's answers, grouped and labelled, with `admin` questions
+ * dropped. Those are collected for the coordinator and a profile screen is the
+ * easiest place to leak them by accident.
+ */
+function shareableSections(): S["PublicProfileSection"][] {
+  const participation = db.session.participations[0];
+  const version =
+    publishedVersion(participation.role) ??
+    db.formVersions.find((v) => v.role === participation.role)!;
+
+  const readable = (field: S["FormField"], record: S["AnswerRecord"]) => {
+    const label = (id: string) =>
+      field.options?.find((o) => o.id === id)?.label ?? id;
+    const value = record.value;
+    if (Array.isArray(value)) return value.map(label).join(", ");
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    if (typeof value === "string" && field.options) return label(value);
+    return String(value);
+  };
+
+  return version.sections
+    .map((section) => ({
+      title: section.title,
+      entries: section.fields
+        .filter((f) => !f.admin)
+        .flatMap((f) => {
+          const record = db.myAnswers[f.id];
+          if (!record) return [];
+          return [{ label: f.label, value: readable(f, record) }];
+        }),
+    }))
+    .filter((section) => section.entries.length > 0);
+}
+
 const SEGMENTS: S["BroadcastSegment"][] = [
   "everyone",
   "mentors",
@@ -724,6 +817,132 @@ export const handlers = [
     summary.endedAt = endedAt;
 
     return HttpResponse.json(full);
+  }),
+
+  http.get(url("/programs/:programId/me"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+    return HttpResponse.json(myProfile());
+  }),
+
+  http.put(url("/programs/:programId/me"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body = (await request.json()) as S["ProfileSave"];
+    if (!body?.answers || typeof body.answers !== "object") {
+      return problem(400, "invalid_body", "Send the answers being saved.");
+    }
+
+    // Merged, not replaced: a per-section save must not blank the sections
+    // that were never on screen.
+    const now = new Date().toISOString();
+    for (const [fieldId, answer] of Object.entries(body.answers)) {
+      db.myAnswers[fieldId] = { ...answer, answeredAt: now };
+    }
+
+    return HttpResponse.json(myProfile());
+  }),
+
+  http.get(url("/programs/:programId/directory"), ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const q = new URL(request.url).searchParams;
+    const term = (q.get("q") ?? "").trim().toLowerCase();
+    const skill = q.get("skill");
+    const page = Number(q.get("page") ?? 1);
+    const pageSize = Number(q.get("pageSize") ?? 25);
+
+    // The opposite role: the seeded account is a mentor, so it browses mentees.
+    const myRole = db.session.participations[0]?.role ?? "mentor";
+    const wanted = myRole === "mentor" ? "mentee" : "mentor";
+
+    const entries: S["DirectoryEntry"][] = db.roster
+      .filter((r) => r.role === wanted && r.status === "approved")
+      .map((r) => {
+        const skills = skillsFor(r);
+        const full =
+          r.capacity !== null &&
+          r.capacity !== undefined &&
+          (r.load ?? 0) >= r.capacity;
+        return {
+          participationId: r.id,
+          name: r.account.name,
+          photoUrl: null,
+          headline: headlineFor(r),
+          role: r.role,
+          timezone: r.timezone,
+          skills,
+          available: !full,
+          unavailableReason: full
+            ? "Already mentoring as many people as they agreed to"
+            : null,
+        };
+      });
+
+    const filtered = entries.filter((e) => {
+      if (skill && !e.skills.includes(skill)) return false;
+      if (!term) return true;
+      return (
+        e.name.toLowerCase().includes(term) ||
+        (e.headline ?? "").toLowerCase().includes(term) ||
+        e.skills.some((s) => s.toLowerCase().includes(term))
+      );
+    });
+
+    const body: S["DirectoryPage"] = {
+      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      page,
+      pageSize,
+      total: filtered.length,
+      selfMatchingEnabled: db.selfMatchingEnabled,
+      skills: [...new Set(entries.flatMap((e) => e.skills))].sort(),
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(url("/participations/:participationId/profile"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+
+    const entry = db.roster.find((r) => r.id === params.participationId);
+    if (!entry) return notFound("participant");
+
+    const full =
+      entry.capacity !== null &&
+      entry.capacity !== undefined &&
+      (entry.load ?? 0) >= entry.capacity;
+
+    const body: S["PublicProfile"] = {
+      participationId: entry.id,
+      name: entry.account.name,
+      role: entry.role,
+      photoUrl: null,
+      headline: headlineFor(entry),
+      timezone: entry.timezone,
+      skills: skillsFor(entry),
+      available: !full,
+      capacity: entry.capacity ?? null,
+      load: entry.load ?? null,
+      // Only the current account has stored answers in this mock, so a public
+      // profile shows the shareable shape without inventing words for someone.
+      sections:
+        entry.id === db.session.participations[0]?.id
+          ? shareableSections()
+          : [],
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(url("/programs/:programId/resources"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+    return HttpResponse.json(db.resources);
   }),
 
   http.get(url("/programs/:programId/report"), ({ params, request }) => {

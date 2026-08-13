@@ -574,6 +574,149 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+  /programs/{programId}/me:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: getMyProfile
+      tags: [Participant]
+      summary: The profile the current account holds in this programme
+      description: |
+        A profile is the application answers, read back against the form version
+        they were given on. There is no second shape for a profile: inventing
+        one would mean a coordinator's question could be asked and then never
+        seen again.
+      responses:
+        "200":
+          description: The profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileView"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: saveMyProfile
+      tags: [Participant]
+      summary: Save answers to the profile
+      description: |
+        Partial: only the answers sent are written, so a per-section save cannot
+        blank the sections that were not on screen.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileSave"
+      responses:
+        "200":
+          description: The profile as saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfileView"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/directory:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listDirectory
+      tags: [Participant]
+      summary: Participants a member may browse
+      description: |
+        Filtered to the opposite role. Mentors at capacity are listed as
+        unavailable rather than hidden, per architecture 4.9, so the scarcity
+        is visible instead of looking like an empty directory.
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: skill
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: The directory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DirectoryPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /participations/{participationId}/profile:
+    parameters:
+      - name: participationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getPublicProfile
+      tags: [Participant]
+      summary: One participant as other participants see them
+      description: |
+        Answers to questions flagged `admin` are never included. Those are
+        collected for the coordinator, and a profile screen is the easiest place
+        to leak them by accident.
+      responses:
+        "200":
+          description: The public profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/resources:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listResources
+      tags: [Participant]
+      summary: What the coordinator has published for participants to read
+      responses:
+        "200":
+          description: The resources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Resource"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
   /programs/{programId}/report:
     parameters:
       - $ref: "#/components/parameters/ProgramId"
@@ -2164,6 +2307,195 @@ components:
           description: IANA name, e.g. Africa/Lagos.
         joinedAt:
           type: string
+          format: date-time
+
+    ProfileView:
+      type: object
+      required:
+        [participationId, name, role, completeness, formVersion, answers, thinFieldIds]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        photoUrl:
+          type: [string, "null"]
+          format: uri
+        headline:
+          type: [string, "null"]
+        timezone:
+          type: [string, "null"]
+        completeness:
+          type: number
+          minimum: 0
+          maximum: 1
+        formVersion:
+          $ref: "#/components/schemas/FormVersion"
+        answers:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/AnswerRecord"
+        thinFieldIds:
+          type: array
+          description: |
+            Unanswered, or answered so briefly there is nothing to match on.
+            What guided completion would ask about next.
+          items:
+            type: string
+            format: uuid
+
+    ProfileSave:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: object
+          description: Only the fields being saved. Absent fields are left alone.
+          additionalProperties:
+            $ref: "#/components/schemas/AnswerInput"
+
+    DirectoryEntry:
+      type: object
+      required: [participationId, name, role, skills, available]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        photoUrl:
+          type: [string, "null"]
+        headline:
+          type: [string, "null"]
+        timezone:
+          type: [string, "null"]
+        skills:
+          type: array
+          items:
+            type: string
+        available:
+          type: boolean
+          description: |
+            False for a mentor already at the capacity they set. Shown rather
+            than filtered out, so a member can see that the shortage is real.
+        unavailableReason:
+          type: [string, "null"]
+
+    DirectoryPage:
+      type: object
+      required: [items, page, pageSize, total, selfMatchingEnabled, skills]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DirectoryEntry"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        selfMatchingEnabled:
+          type: boolean
+          description: |
+            The directory only exists when the coordinator turned self-matching
+            on. False is a real state, not an error.
+        skills:
+          type: array
+          description: Every skill in the browsable set, for the filter.
+          items:
+            type: string
+
+    PublicProfile:
+      type: object
+      required: [participationId, name, role, skills, available, sections]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        photoUrl:
+          type: [string, "null"]
+        headline:
+          type: [string, "null"]
+        timezone:
+          type: [string, "null"]
+        skills:
+          type: array
+          items:
+            type: string
+        available:
+          type: boolean
+        capacity:
+          type: [integer, "null"]
+        load:
+          type: [integer, "null"]
+        sections:
+          type: array
+          description: |
+            Shareable answers only, already grouped and labelled. Questions
+            flagged `admin` never appear.
+          items:
+            $ref: "#/components/schemas/PublicProfileSection"
+
+    PublicProfileSection:
+      type: object
+      required: [title, entries]
+      properties:
+        title:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicProfileEntry"
+
+    PublicProfileEntry:
+      type: object
+      required: [label, value]
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+
+    ResourceKind:
+      type: string
+      enum:
+        [
+          handbook,
+          expectations,
+          conversation_starters,
+          code_of_conduct,
+          other,
+        ]
+
+    Resource:
+      type: object
+      required: [id, title, kind, url]
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: [string, "null"]
+        kind:
+          $ref: "#/components/schemas/ResourceKind"
+        url:
+          type: string
+        sizeBytes:
+          type: [integer, "null"]
+        updatedAt:
+          type: [string, "null"]
           format: date-time
 
     TimePoint:
