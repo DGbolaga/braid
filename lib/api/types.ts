@@ -304,6 +304,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Programme health in one response
+         * @description The screen a coordinator opens daily during a live cohort. The attention
+         *     list is the point of it: counts alone say how things are, and the list
+         *     says what to do about them.
+         */
+        get: operations["getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/strand-monitor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** Every strand in the programme, with its health */
+        get: operations["monitorStrands"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/strands/{strandId}/nudge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strandId: components["parameters"]["StrandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send the nudge template to a strand
+         * @description Uses the programme's nudge template rather than free text, so the
+         *     wording is the one the coordinator already reviewed and every quiet
+         *     strand gets the same message.
+         */
+        post: operations["nudgeStrand"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/strands/{strandId}/state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strandId: components["parameters"]["StrandId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Pause, resume or end a strand
+         * @description Ending is one way. A strand that ended keeps its conversation and stays
+         *     readable to both sides; it is not deleted, because the record of what
+         *     was said is the thing participants come back for.
+         */
+        put: operations["setStrandState"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/milestones": {
         parameters: {
             query?: never;
@@ -973,6 +1064,86 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        /**
+         * @description Each value is a thing a human has to decide, not a metric. Anything that
+         *     resolves itself with time does not belong here.
+         * @enum {string}
+         */
+        AttentionKind: "applications_waiting" | "strands_never_started" | "quiet_strands" | "mentors_over_capacity" | "incomplete_profiles" | "unmatched_people";
+        AttentionItem: {
+            kind: components["schemas"]["AttentionKind"];
+            count: number;
+            title: string;
+            body?: string | null;
+            actionLabel: string;
+            /**
+             * @description Relative to the programme's admin base, so the server does not have
+             *     to know the org slug the coordinator arrived by.
+             */
+            href: string;
+        };
+        DashboardSummary: {
+            mentorCount: number;
+            menteeCount: number;
+            /** @description Mentees the programme set out to recruit. Null if none was set. */
+            recruitmentGoal?: number | null;
+            matchedCount: number;
+            unmatchedCount: number;
+            activeStrands: number;
+            /** @description Active strands with no message for fourteen days. */
+            quietStrands: number;
+            sessionsLoggedThisWeek: number;
+            upcomingMilestone?: components["schemas"]["Milestone"] | null;
+            /**
+             * @description Ordered by how much it costs to leave alone, not by count. An
+             *     empty list is a real and good answer.
+             */
+            attention: components["schemas"]["AttentionItem"][];
+        };
+        /**
+         * @description Derived from activity, never stored. `not_started` is separated from
+         *     `quiet` deliberately: a pair who never began needs an introduction, and
+         *     a pair who stopped needs a different conversation.
+         * @enum {string}
+         */
+        StrandHealth: "on_track" | "slow" | "quiet" | "not_started" | "ended";
+        StrandMonitorEntry: {
+            /** Format: uuid */
+            id: string;
+            state: components["schemas"]["StrandState"];
+            originMode: components["schemas"]["OriginMode"];
+            members: components["schemas"]["StrandMember"][];
+            /** @description Null when nothing has ever been said. */
+            daysSinceActivity?: number | null;
+            sessionsLogged: number;
+            milestonesCompleted: number;
+            milestonesTotal: number;
+            health: components["schemas"]["StrandHealth"];
+        };
+        StrandHealthCounts: {
+            on_track: number;
+            slow: number;
+            quiet: number;
+            not_started: number;
+            ended: number;
+        };
+        StrandMonitorPage: {
+            items: components["schemas"]["StrandMonitorEntry"][];
+            page: number;
+            pageSize: number;
+            total: number;
+            healthCounts: components["schemas"]["StrandHealthCounts"];
+        };
+        NudgeResult: {
+            /** @description How many people the nudge went to. */
+            sentTo: number;
+        };
+        StrandStateChange: {
+            /** @enum {string} */
+            state: "active" | "paused" | "ended";
+            /** @description Recorded against the change for the audit log. */
+            reason?: string | null;
         };
         /**
          * @description A point in the programme arc, defined against the cohort start rather
@@ -1838,6 +2009,133 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    getDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    monitorStrands: {
+        parameters: {
+            query?: {
+                health?: components["schemas"]["StrandHealth"];
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+            };
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of strands */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrandMonitorPage"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    nudgeStrand: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strandId: components["parameters"]["StrandId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued for delivery */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NudgeResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The strand has ended, so there is nobody to nudge */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    setStrandState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strandId: components["parameters"]["StrandId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StrandStateChange"];
+            };
+        };
+        responses: {
+            /** @description The strand in its new state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Strand"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description That transition is not allowed from the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     listProgramMilestones: {

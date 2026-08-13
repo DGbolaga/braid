@@ -46,6 +46,11 @@ tags:
     description: |
       What a coordinator configures before a cohort runs: the programme arc and
       the messages it sends.
+  - name: Monitoring
+    description: |
+      Programme health while a cohort is live, and the strands it is made of.
+      Everything here is derived, never stored: a quiet strand is a strand that
+      has not been written in, not a strand somebody flagged.
   - name: Strands
     description: Mentoring relationships and their message threads.
 
@@ -439,6 +444,129 @@ paths:
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/dashboard:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: getDashboard
+      tags: [Monitoring]
+      summary: Programme health in one response
+      description: |
+        The screen a coordinator opens daily during a live cohort. The attention
+        list is the point of it: counts alone say how things are, and the list
+        says what to do about them.
+      responses:
+        "200":
+          description: The dashboard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/strand-monitor:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: monitorStrands
+      tags: [Monitoring]
+      summary: Every strand in the programme, with its health
+      parameters:
+        - name: health
+          in: query
+          schema:
+            $ref: "#/components/schemas/StrandHealth"
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: A page of strands
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrandMonitorPage"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /strands/{strandId}/nudge:
+    parameters:
+      - $ref: "#/components/parameters/StrandId"
+    post:
+      operationId: nudgeStrand
+      tags: [Monitoring]
+      summary: Send the nudge template to a strand
+      description: |
+        Uses the programme's nudge template rather than free text, so the
+        wording is the one the coordinator already reviewed and every quiet
+        strand gets the same message.
+      responses:
+        "202":
+          description: Queued for delivery
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NudgeResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: The strand has ended, so there is nobody to nudge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /strands/{strandId}/state:
+    parameters:
+      - $ref: "#/components/parameters/StrandId"
+    put:
+      operationId: setStrandState
+      tags: [Monitoring]
+      summary: Pause, resume or end a strand
+      description: |
+        Ending is one way. A strand that ended keeps its conversation and stays
+        readable to both sides; it is not deleted, because the record of what
+        was said is the thing participants come back for.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StrandStateChange"
+      responses:
+        "200":
+          description: The strand in its new state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Strand"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: That transition is not allowed from the current state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
 
   /programs/{programId}/milestones:
     parameters:
@@ -1702,6 +1830,182 @@ components:
         joinedAt:
           type: string
           format: date-time
+
+    AttentionKind:
+      type: string
+      description: |
+        Each value is a thing a human has to decide, not a metric. Anything that
+        resolves itself with time does not belong here.
+      enum:
+        [
+          applications_waiting,
+          strands_never_started,
+          quiet_strands,
+          mentors_over_capacity,
+          incomplete_profiles,
+          unmatched_people,
+        ]
+
+    AttentionItem:
+      type: object
+      required: [kind, count, title, actionLabel, href]
+      properties:
+        kind:
+          $ref: "#/components/schemas/AttentionKind"
+        count:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        body:
+          type: [string, "null"]
+        actionLabel:
+          type: string
+        href:
+          type: string
+          description: |
+            Relative to the programme's admin base, so the server does not have
+            to know the org slug the coordinator arrived by.
+
+    DashboardSummary:
+      type: object
+      required:
+        [
+          mentorCount,
+          menteeCount,
+          matchedCount,
+          unmatchedCount,
+          activeStrands,
+          quietStrands,
+          sessionsLoggedThisWeek,
+          attention,
+        ]
+      properties:
+        mentorCount:
+          type: integer
+        menteeCount:
+          type: integer
+        recruitmentGoal:
+          type: [integer, "null"]
+          description: Mentees the programme set out to recruit. Null if none was set.
+        matchedCount:
+          type: integer
+        unmatchedCount:
+          type: integer
+        activeStrands:
+          type: integer
+        quietStrands:
+          type: integer
+          description: Active strands with no message for fourteen days.
+        sessionsLoggedThisWeek:
+          type: integer
+        upcomingMilestone:
+          oneOf:
+            - $ref: "#/components/schemas/Milestone"
+            - type: "null"
+        attention:
+          type: array
+          description: |
+            Ordered by how much it costs to leave alone, not by count. An
+            empty list is a real and good answer.
+          items:
+            $ref: "#/components/schemas/AttentionItem"
+
+    StrandHealth:
+      type: string
+      description: |
+        Derived from activity, never stored. `not_started` is separated from
+        `quiet` deliberately: a pair who never began needs an introduction, and
+        a pair who stopped needs a different conversation.
+      enum: [on_track, slow, quiet, not_started, ended]
+
+    StrandMonitorEntry:
+      type: object
+      required:
+        [
+          id,
+          state,
+          originMode,
+          members,
+          sessionsLogged,
+          milestonesCompleted,
+          milestonesTotal,
+          health,
+        ]
+      properties:
+        id:
+          type: string
+          format: uuid
+        state:
+          $ref: "#/components/schemas/StrandState"
+        originMode:
+          $ref: "#/components/schemas/OriginMode"
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrandMember"
+        daysSinceActivity:
+          type: [integer, "null"]
+          description: Null when nothing has ever been said.
+        sessionsLogged:
+          type: integer
+        milestonesCompleted:
+          type: integer
+        milestonesTotal:
+          type: integer
+        health:
+          $ref: "#/components/schemas/StrandHealth"
+
+    StrandHealthCounts:
+      type: object
+      required: [on_track, slow, quiet, not_started, ended]
+      properties:
+        on_track:
+          type: integer
+        slow:
+          type: integer
+        quiet:
+          type: integer
+        not_started:
+          type: integer
+        ended:
+          type: integer
+
+    StrandMonitorPage:
+      type: object
+      required: [items, page, pageSize, total, healthCounts]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StrandMonitorEntry"
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        healthCounts:
+          $ref: "#/components/schemas/StrandHealthCounts"
+
+    NudgeResult:
+      type: object
+      required: [sentTo]
+      properties:
+        sentTo:
+          type: integer
+          description: How many people the nudge went to.
+
+    StrandStateChange:
+      type: object
+      required: [state]
+      properties:
+        state:
+          type: string
+          enum: [active, paused, ended]
+        reason:
+          type: [string, "null"]
+          description: Recorded against the change for the audit log.
 
     ProgramMilestone:
       type: object

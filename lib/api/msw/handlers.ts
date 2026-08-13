@@ -20,6 +20,67 @@ const requireSession = () => (db.signedIn ? null : unauthorized());
 const nextId = (kind: number) =>
   `${String(kind).padStart(8, "0")}-0000-4000-8000-${String(++db.seq).padStart(12, "0")}`;
 
+const DAY = 86_400_000;
+/** 8.3 puts the quiet threshold at fourteen days. One definition, used here
+ *  and on the participant's card, so the two cannot disagree. */
+const QUIET_AFTER_DAYS = 14;
+
+/**
+ * Health is derived on every read, never stored. A quiet strand is one that has
+ * not been written in — not one somebody flagged as quiet and forgot about.
+ */
+function healthOf(
+  summary: S["StrandSummary"],
+  daysSinceActivity: number | null,
+  milestonesCompleted: number,
+  milestonesTotal: number,
+): S["StrandHealth"] {
+  if (summary.state === "ended") return "ended";
+  // Never begun is its own state: that pair needs an introduction, and a pair
+  // who stopped after eight sessions needs a different conversation entirely.
+  if (summary.lastMessage === null) return "not_started";
+  if (daysSinceActivity !== null && daysSinceActivity >= QUIET_AFTER_DAYS) {
+    return "quiet";
+  }
+  // Talking, but the arc has moved on without them.
+  if (milestonesTotal > 0 && milestonesCompleted === 0) return "slow";
+  return "on_track";
+}
+
+function toMonitorEntry(summary: S["StrandSummary"]): S["StrandMonitorEntry"] {
+  const metrics = db.strandMetrics[summary.id] ?? {
+    sessionsLogged: 0,
+    milestonesCompleted: 0,
+  };
+  const milestonesTotal = db.milestones.length;
+  const daysSinceActivity = summary.lastActivityAt
+    ? Math.floor((Date.now() - new Date(summary.lastActivityAt).getTime()) / DAY)
+    : null;
+
+  // From the full strand, not the summary. A summary's members are "everyone
+  // except the current account", which is right for a participant reading their
+  // own strand and wrong here: a coordinator is not a party to most of these
+  // and needs both names to know which pairing a row is.
+  const full = db.strands.find((s) => s.id === summary.id);
+
+  return {
+    id: summary.id,
+    state: summary.state,
+    originMode: summary.originMode,
+    members: full?.members ?? summary.members,
+    daysSinceActivity,
+    sessionsLogged: metrics.sessionsLogged,
+    milestonesCompleted: metrics.milestonesCompleted,
+    milestonesTotal,
+    health: healthOf(
+      summary,
+      daysSinceActivity,
+      metrics.milestonesCompleted,
+      milestonesTotal,
+    ),
+  };
+}
+
 /** Week order, ties broken by position, so the arc always reads forwards. */
 const orderedMilestones = () =>
   [...db.milestones].sort(
@@ -373,6 +434,185 @@ export const handlers = [
       total: filtered.length,
     };
     return HttpResponse.json(body);
+  }),
+
+  http.get(url("/programs/:programId/dashboard"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const monitor = db.strandSummaries.map(toMonitorEntry);
+    const active = monitor.filter((m) => m.state === "active");
+    // Kept apart on purpose. A pair who stopped needs a nudge; a pair who never
+    // began needs an introduction, and calling both "quiet" hides that.
+    const quiet = active.filter((m) => m.health === "quiet");
+    const neverStarted = active.filter((m) => m.health === "not_started");
+
+    const waiting = db.applications.filter((a) => a.status === "submitted").length;
+    const overCapacity = db.roster.filter(
+      (r) =>
+        r.role === "mentor" &&
+        r.capacity !== null &&
+        r.capacity !== undefined &&
+        (r.load ?? 0) > r.capacity,
+    ).length;
+    const incomplete = db.roster.filter(
+      (r) => r.status === "approved" && r.profileCompleteness < 0.6,
+    ).length;
+
+    /**
+     * Ordered by what it costs to leave alone, not by count. An application
+     * nobody reads stops a person joining at all; an incomplete profile only
+     * makes a match worse.
+     */
+    const attention: S["AttentionItem"][] = [];
+
+    if (waiting > 0) {
+      attention.push({
+        kind: "applications_waiting",
+        count: waiting,
+        title: `${waiting} ${waiting === 1 ? "application is" : "applications are"} waiting to be read`,
+        body: "Nobody joins the roster until these are decided.",
+        actionLabel: "Read them",
+        href: "/applications",
+      });
+    }
+    if (db.unmatched.length > 0) {
+      attention.push({
+        kind: "unmatched_people",
+        count: db.unmatched.length,
+        title: `${db.unmatched.length} ${db.unmatched.length === 1 ? "person has" : "people have"} no strand`,
+        body: "Each one has a reason, and the reasons need different things.",
+        actionLabel: "Open the queue",
+        href: "/unmatched",
+      });
+    }
+    if (neverStarted.length > 0) {
+      attention.push({
+        kind: "strands_never_started",
+        count: neverStarted.length,
+        title: `${neverStarted.length} ${neverStarted.length === 1 ? "strand has" : "strands have"} never started`,
+        body: "Matched, but nobody has written anything yet. The first message is the one that decides whether the rest happen.",
+        actionLabel: "See which",
+        href: "/strands?health=not_started",
+      });
+    }
+    if (quiet.length > 0) {
+      attention.push({
+        kind: "quiet_strands",
+        count: quiet.length,
+        title: `${quiet.length} ${quiet.length === 1 ? "strand has" : "strands have"} gone quiet`,
+        body: "A fortnight without a message. A nudge is usually enough.",
+        actionLabel: "See which",
+        href: "/strands?health=quiet",
+      });
+    }
+    if (overCapacity > 0) {
+      attention.push({
+        kind: "mentors_over_capacity",
+        count: overCapacity,
+        title: `${overCapacity} ${overCapacity === 1 ? "mentor is" : "mentors are"} over the capacity they set`,
+        body: "They agreed to fewer mentees than they now hold.",
+        actionLabel: "Open the roster",
+        href: "/roster",
+      });
+    }
+    if (incomplete > 0) {
+      attention.push({
+        kind: "incomplete_profiles",
+        count: incomplete,
+        title: `${incomplete} ${incomplete === 1 ? "profile is" : "profiles are"} too thin to match well`,
+        body: "Matching works on what people tell us. These need a nudge, not a decision.",
+        actionLabel: "Open the roster",
+        href: "/roster",
+      });
+    }
+
+    const body: S["DashboardSummary"] = {
+      mentorCount: db.roster.filter((r) => r.role === "mentor").length,
+      menteeCount: db.roster.filter((r) => r.role === "mentee").length,
+      recruitmentGoal: 20,
+      matchedCount: db.roster.filter((r) => r.role === "mentee" && r.matched).length,
+      unmatchedCount: db.unmatched.length,
+      activeStrands: active.length,
+      quietStrands: quiet.length,
+      sessionsLoggedThisWeek: Object.values(db.strandMetrics).reduce(
+        (n, m) => n + (m.sessionsLogged > 0 ? 1 : 0),
+        0,
+      ),
+      upcomingMilestone: db.home.upcomingMilestone ?? null,
+      attention,
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.get(url("/programs/:programId/strand-monitor"), ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const q = new URL(request.url).searchParams;
+    const health = q.get("health");
+    const page = Number(q.get("page") ?? 1);
+    const pageSize = Number(q.get("pageSize") ?? 25);
+
+    const all = db.strandSummaries.map(toMonitorEntry);
+    const filtered = all.filter((e) => !health || e.health === health);
+
+    const body: S["StrandMonitorPage"] = {
+      items: filtered.slice((page - 1) * pageSize, page * pageSize),
+      page,
+      pageSize,
+      total: filtered.length,
+      healthCounts: {
+        on_track: all.filter((e) => e.health === "on_track").length,
+        slow: all.filter((e) => e.health === "slow").length,
+        quiet: all.filter((e) => e.health === "quiet").length,
+        not_started: all.filter((e) => e.health === "not_started").length,
+        ended: all.filter((e) => e.health === "ended").length,
+      },
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.post(url("/strands/:strandId/nudge"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+
+    const summary = db.strandSummaries.find((s) => s.id === params.strandId);
+    if (!summary) return notFound("strand");
+    if (summary.state === "ended") {
+      return problem(409, "strand_ended", "This strand has ended. There is nobody to nudge.");
+    }
+
+    const result: S["NudgeResult"] = { sentTo: summary.members.length + 1 };
+    return HttpResponse.json(result, { status: 202 });
+  }),
+
+  http.put(url("/strands/:strandId/state"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+
+    const full = db.strands.find((s) => s.id === params.strandId);
+    const summary = db.strandSummaries.find((s) => s.id === params.strandId);
+    if (!full || !summary) return notFound("strand");
+
+    const body = (await request.json()) as S["StrandStateChange"];
+    const next = body?.state;
+    if (next !== "active" && next !== "paused" && next !== "ended") {
+      return problem(400, "invalid_state", "Choose active, paused or ended.");
+    }
+    if (full.state === "ended") {
+      return problem(409, "already_ended", "This strand has already ended.");
+    }
+
+    full.state = next;
+    summary.state = next;
+    const endedAt = next === "ended" ? new Date().toISOString() : null;
+    full.endedAt = endedAt;
+    summary.endedAt = endedAt;
+
+    return HttpResponse.json(full);
   }),
 
   http.get(url("/programs/:programId/milestones"), ({ params }) => {

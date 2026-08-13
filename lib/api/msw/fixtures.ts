@@ -465,12 +465,18 @@ type StrandSeed = {
   /** Omitted means active. An ended strand needs `endedDaysAgo` with it. */
   state?: S["StrandState"];
   endedDaysAgo?: number;
+  /** What the monitor reports. Sessions logged matter more than sessions
+   *  scheduled, per architecture 4.7, so this is the engagement signal. */
+  sessionsLogged?: number;
+  milestonesCompleted?: number;
   messages: Array<[fromMe: boolean, daysAgo: number, body: string]>;
 };
 
 const STRAND_SEEDS: StrandSeed[] = [
   {
     n: 1,
+    sessionsLogged: 4,
+    milestonesCompleted: 2,
     menteeIdx: 0,
     lastActivityDaysAgo: 1,
     unread: 2,
@@ -488,6 +494,8 @@ const STRAND_SEEDS: StrandSeed[] = [
   },
   {
     n: 2,
+    sessionsLogged: 3,
+    milestonesCompleted: 2,
     menteeIdx: 2,
     lastActivityDaysAgo: 5,
     unread: 0,
@@ -502,6 +510,8 @@ const STRAND_SEEDS: StrandSeed[] = [
   },
   {
     n: 3,
+    sessionsLogged: 1,
+    milestonesCompleted: 0,
     menteeIdx: 8,
     lastActivityDaysAgo: 23,
     unread: 0,
@@ -515,6 +525,8 @@ const STRAND_SEEDS: StrandSeed[] = [
     // Matched this morning, nothing written. The state the design file draws:
     // somebody is waiting on the other end and the screen has to say so.
     n: 5,
+    sessionsLogged: 0,
+    milestonesCompleted: 0,
     menteeIdx: 5,
     lastActivityDaysAgo: 0,
     unread: 0,
@@ -523,6 +535,8 @@ const STRAND_SEEDS: StrandSeed[] = [
   },
   {
     n: 4,
+    sessionsLogged: 6,
+    milestonesCompleted: 3,
     menteeIdx: 4,
     lastActivityDaysAgo: 40,
     unread: 0,
@@ -544,6 +558,8 @@ function buildStrands() {
   const strands: S["Strand"][] = [];
   const summaries: S["StrandSummary"][] = [];
   const messages: Record<string, S["Message"][]> = {};
+  /** Keyed by strand id. What the monitor reports and the thread cannot show. */
+  const metrics: Record<string, { sessionsLogged: number; milestonesCompleted: number }> = {};
 
   for (const seed of STRAND_SEEDS) {
     const id = strand(seed.n);
@@ -593,6 +609,11 @@ function buildStrands() {
       endedAt,
     });
 
+    metrics[id] = {
+      sessionsLogged: seed.sessionsLogged ?? 0,
+      milestonesCompleted: seed.milestonesCompleted ?? 0,
+    };
+
     summaries.push({
       id,
       programId: PROGRAM,
@@ -612,11 +633,11 @@ function buildStrands() {
     });
   }
 
-  return { strands, summaries, messages };
+  return { strands, summaries, messages, metrics };
 }
 
 export function createDb() {
-  const { strands, summaries, messages } = buildStrands();
+  const { strands, summaries, messages, metrics } = buildStrands();
 
   const program: S["ProgramPublic"] = {
     id: PROGRAM,
@@ -1033,6 +1054,7 @@ export function createDb() {
     applications,
     unmatched,
     milestones,
+    strandMetrics: metrics,
     /** Structured clone so resetting a template can restore untouched text. */
     templates: DEFAULT_TEMPLATES.map((t) => ({ ...t })),
     defaultTemplates: DEFAULT_TEMPLATES,
