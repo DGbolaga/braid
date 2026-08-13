@@ -395,6 +395,82 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The draft, the live version, and what came before
+         * @description Everything the builder needs for one role in one response. A programme
+         *     may hold a draft and a published version at once — that is the normal
+         *     state while a coordinator is editing a live form.
+         */
+        get: operations["getFormEditorState"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/forms/{role}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+                role: components["schemas"]["Role"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save the working copy
+         * @description Writes to the draft, never to anything already published. If the role
+         *     has no draft yet, one is started from the published version, so opening
+         *     a live form and editing it cannot alter what applicants are answering
+         *     right now.
+         */
+        put: operations["saveFormDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/forms/{role}/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+                role: components["schemas"]["Role"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make the draft the live form
+         * @description Mints the next version number. Applications already submitted keep the
+         *     version they were answered against for good: the form they saw is part
+         *     of what they said, and re-reading an old application through a new form
+         *     would put questions in someone's mouth.
+         */
+        post: operations["publishFormDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/milestones": {
         parameters: {
             query?: never;
@@ -1064,6 +1140,34 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        FormVersionSummary: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            /** Format: date-time */
+            publishedAt?: string | null;
+            questionCount: number;
+            /**
+             * @description How many applications were answered against this version. The
+             *     reason an old version cannot be deleted.
+             */
+            applicationCount?: number;
+        };
+        FormEditorState: {
+            role: components["schemas"]["Role"];
+            /** @description The working copy. Null when nothing is being edited. */
+            draft?: components["schemas"]["FormVersion"] | null;
+            /**
+             * @description What applicants are answering now. Null before the first publish,
+             *     which is the state a new programme starts in.
+             */
+            published?: components["schemas"]["FormVersion"] | null;
+            /** @description Every version, newest first, including the live one. */
+            history: components["schemas"]["FormVersionSummary"][];
+        };
+        FormDraftSave: {
+            sections: components["schemas"]["FormSection"][];
         };
         /**
          * @description Each value is a thing a human has to decide, not a metric. Anything that
@@ -2128,6 +2232,102 @@ export interface operations {
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             /** @description That transition is not allowed from the current state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getFormEditorState: {
+        parameters: {
+            query: {
+                role: components["schemas"]["Role"];
+            };
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The editor state for that role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormEditorState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveFormDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+                role: components["schemas"]["Role"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FormDraftSave"];
+            };
+        };
+        responses: {
+            /** @description The saved draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    publishFormDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+                role: components["schemas"]["Role"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The newly published version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormVersion"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /**
+             * @description There is nothing to publish, or the draft is not publishable — an
+             *     empty form, a question with no label, or a select with no options.
+             */
             409: {
                 headers: {
                     [name: string]: unknown;

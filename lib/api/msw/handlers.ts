@@ -20,6 +20,41 @@ const requireSession = () => (db.signedIn ? null : unauthorized());
 const nextId = (kind: number) =>
   `${String(kind).padStart(8, "0")}-0000-4000-8000-${String(++db.seq).padStart(12, "0")}`;
 
+/** The live form for a role: the newest published version, not merely a published one. */
+const publishedVersion = (role: S["Role"]) =>
+  db.formVersions
+    .filter((v) => v.role === role && v.publishedAt !== null)
+    .sort((a, b) => b.version - a.version)[0] ?? null;
+
+/**
+ * What would make a published form unusable to an applicant. Checked before
+ * publishing rather than after, because the version that goes live is the one
+ * strangers answer on a phone from a WhatsApp link.
+ */
+function unpublishable(draft: S["FormVersion"]): string | null {
+  const fields = draft.sections.flatMap((s) => s.fields);
+  if (fields.length === 0) {
+    return "This form has no questions in it yet.";
+  }
+  const untitled = fields.find((f) => !f.label.trim());
+  if (untitled) {
+    return "Every question needs a label before this can go live.";
+  }
+  const emptySelect = fields.find(
+    (f) =>
+      (f.type === "single_select" || f.type === "multi_select") &&
+      (f.options ?? []).length === 0,
+  );
+  if (emptySelect) {
+    return `"${emptySelect.label}" is a choice question with nothing to choose from.`;
+  }
+  const untitledSection = draft.sections.find((s) => !s.title.trim());
+  if (untitledSection) {
+    return "Every section needs a title before this can go live.";
+  }
+  return null;
+}
+
 const DAY = 86_400_000;
 /** 8.3 puts the quiet threshold at fourteen days. One definition, used here
  *  and on the participant's card, so the two cannot disagree. */
@@ -226,9 +261,11 @@ export const handlers = [
         return notFound("program");
       }
       const role = new URL(request.url).searchParams.get("role");
-      const found = db.formVersions.find(
-        (v) => v.role === role && v.publishedAt !== null,
-      );
+      // The newest published version, not merely a published one. `find` here
+      // returned whichever was seeded first, so publishing a new version left
+      // applicants answering the old questions.
+      const found =
+        role === "mentee" || role === "mentor" ? publishedVersion(role) : null;
       return found
         ? HttpResponse.json(found)
         : problem(
@@ -613,6 +650,97 @@ export const handlers = [
     summary.endedAt = endedAt;
 
     return HttpResponse.json(full);
+  }),
+
+  http.get(url("/programs/:programId/forms"), ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const role = new URL(request.url).searchParams.get("role");
+    if (role !== "mentee" && role !== "mentor") {
+      return problem(400, "invalid_role", "Ask for the mentee or the mentor form.");
+    }
+
+    const forRole = db.formVersions.filter((v) => v.role === role);
+    const body: S["FormEditorState"] = {
+      role,
+      draft: forRole.find((v) => v.publishedAt === null) ?? null,
+      published: publishedVersion(role),
+      history: [...forRole]
+        .sort((a, b) => b.version - a.version)
+        .map((v) => ({
+          id: v.id,
+          version: v.version,
+          publishedAt: v.publishedAt ?? null,
+          questionCount: v.sections.flatMap((s) => s.fields).length,
+          applicationCount: db.applications.filter(
+            (a) => a.formVersionId === v.id,
+          ).length,
+        })),
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.put(url("/programs/:programId/forms/:role/draft"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const role = params.role;
+    if (role !== "mentee" && role !== "mentor") return notFound("form");
+
+    const body = (await request.json()) as S["FormDraftSave"];
+    if (!Array.isArray(body?.sections)) {
+      return problem(400, "invalid_body", "Send the whole form.");
+    }
+
+    let draft = db.formVersions.find(
+      (v) => v.role === role && v.publishedAt === null,
+    );
+
+    if (!draft) {
+      // Started from the published version rather than edited in place. This is
+      // the whole guarantee of the screen: opening a live form and typing must
+      // not change what an applicant is answering this minute.
+      const live = publishedVersion(role);
+      draft = {
+        id: nextId(12),
+        programId: PROGRAM_ID,
+        role,
+        version: (live?.version ?? 0) + 1,
+        publishedAt: null,
+        sections: [],
+      };
+      db.formVersions.push(draft);
+    }
+
+    draft.sections = body.sections;
+    return HttpResponse.json(draft);
+  }),
+
+  http.post(url("/programs/:programId/forms/:role/publish"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const role = params.role;
+    if (role !== "mentee" && role !== "mentor") return notFound("form");
+
+    const draft = db.formVersions.find(
+      (v) => v.role === role && v.publishedAt === null,
+    );
+    if (!draft) {
+      return problem(409, "nothing_to_publish", "There is no draft to publish.");
+    }
+
+    const complaint = unpublishable(draft);
+    if (complaint) return problem(409, "draft_incomplete", complaint);
+
+    // The previous published version stays exactly as it is. Applications
+    // already answered against it keep pointing at it.
+    draft.publishedAt = new Date().toISOString();
+    return HttpResponse.json(draft);
   }),
 
   http.get(url("/programs/:programId/milestones"), ({ params }) => {

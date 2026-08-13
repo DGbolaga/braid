@@ -568,6 +568,115 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+  /programs/{programId}/forms:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: getFormEditorState
+      tags: [Setup]
+      summary: The draft, the live version, and what came before
+      description: |
+        Everything the builder needs for one role in one response. A programme
+        may hold a draft and a published version at once — that is the normal
+        state while a coordinator is editing a live form.
+      parameters:
+        - name: role
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/Role"
+      responses:
+        "200":
+          description: The editor state for that role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormEditorState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/forms/{role}/draft:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+      - name: role
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Role"
+    put:
+      operationId: saveFormDraft
+      tags: [Setup]
+      summary: Save the working copy
+      description: |
+        Writes to the draft, never to anything already published. If the role
+        has no draft yet, one is started from the published version, so opening
+        a live form and editing it cannot alter what applicants are answering
+        right now.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FormDraftSave"
+      responses:
+        "200":
+          description: The saved draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormVersion"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/forms/{role}/publish:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+      - name: role
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/Role"
+    post:
+      operationId: publishFormDraft
+      tags: [Setup]
+      summary: Make the draft the live form
+      description: |
+        Mints the next version number. Applications already submitted keep the
+        version they were answered against for good: the form they saw is part
+        of what they said, and re-reading an old application through a new form
+        would put questions in someone's mouth.
+      responses:
+        "200":
+          description: The newly published version
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FormVersion"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: |
+            There is nothing to publish, or the draft is not publishable — an
+            empty form, a question with no label, or a select with no options.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
   /programs/{programId}/milestones:
     parameters:
       - $ref: "#/components/parameters/ProgramId"
@@ -1830,6 +1939,59 @@ components:
         joinedAt:
           type: string
           format: date-time
+
+    FormVersionSummary:
+      type: object
+      required: [id, version, questionCount]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+        publishedAt:
+          type: [string, "null"]
+          format: date-time
+        questionCount:
+          type: integer
+        applicationCount:
+          type: integer
+          description: |
+            How many applications were answered against this version. The
+            reason an old version cannot be deleted.
+
+    FormEditorState:
+      type: object
+      required: [role, history]
+      properties:
+        role:
+          $ref: "#/components/schemas/Role"
+        draft:
+          oneOf:
+            - $ref: "#/components/schemas/FormVersion"
+            - type: "null"
+          description: The working copy. Null when nothing is being edited.
+        published:
+          oneOf:
+            - $ref: "#/components/schemas/FormVersion"
+            - type: "null"
+          description: |
+            What applicants are answering now. Null before the first publish,
+            which is the state a new programme starts in.
+        history:
+          type: array
+          description: Every version, newest first, including the live one.
+          items:
+            $ref: "#/components/schemas/FormVersionSummary"
+
+    FormDraftSave:
+      type: object
+      required: [sections]
+      properties:
+        sections:
+          type: array
+          items:
+            $ref: "#/components/schemas/FormSection"
 
     AttentionKind:
       type: string
