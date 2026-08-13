@@ -395,6 +395,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The account, how it wants to be contacted, and what it belongs to */
+        get: operations["getAccountSettings"];
+        /**
+         * Change the name or the notification preferences
+         * @description There is no password here. Sign-in is by emailed link, so an account has
+         *     no password to change, and a settings screen offering one would be
+         *     describing a mechanism that does not exist.
+         */
+        put: operations["saveAccountSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/account/programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every programme this account belongs to */
+        get: operations["listAccountPrograms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/participations/{participationId}/mute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participationId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Stop or resume email from one programme
+         * @description Muting silences the programme's email. It does not leave it, and the
+         *     strands stay live — somebody stepping back from their inbox has not
+         *     stepped back from their mentor.
+         */
+        put: operations["muteParticipation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/participations/{participationId}/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participationId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Leave a programme
+         * @description Ends the participation and any strand it holds. The conversation is
+         *     kept and the other side is told, because a strand that goes silent with
+         *     no explanation reads as being dropped.
+         */
+        post: operations["leaveProgram"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        /**
+         * Read an invitation
+         * @description Returns the invitation whatever state it is in, including expired. A
+         *     404 for a spent token would send somebody to a dead end when the useful
+         *     answer is that it lapsed and can be reissued.
+         */
+        get: operations["getInvite"];
+        put?: never;
+        /** Accept or decline an invitation */
+        post: operations["respondToInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invites/{token}/reissue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the coordinator for a fresh invitation
+         * @description What an expired invitation offers instead of a dead end. The coordinator
+         *     is told; no new token is minted here.
+         */
+        post: operations["requestNewInvite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/me": {
         parameters: {
             query?: never;
@@ -1355,6 +1491,87 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        /** @enum {string} */
+        DigestFrequency: "off" | "daily" | "weekly";
+        /**
+         * @description Per kind rather than one switch. Somebody who wants to know when their
+         *     mentor writes but not when the programme sends a newsletter should not
+         *     have to choose between both and neither.
+         */
+        NotificationPreferences: {
+            newMessage: boolean;
+            matchPublished: boolean;
+            milestoneReminders: boolean;
+            broadcasts: boolean;
+            digest: components["schemas"]["DigestFrequency"];
+        };
+        AccountProgram: {
+            /** Format: uuid */
+            participationId: string;
+            /** Format: uuid */
+            programId: string;
+            programName: string;
+            organisationName: string;
+            orgSlug: string;
+            programSlug: string;
+            role: components["schemas"]["Role"];
+            status: components["schemas"]["ParticipationStatus"];
+            isCoordinator?: boolean;
+            muted: boolean;
+            unreadCount: number;
+            /**
+             * @description True once a cohort has finished. The programme stays open to read;
+             *     architecture 4.17 asks for exactly that rather than hiding it.
+             */
+            readOnly: boolean;
+        };
+        AccountSettings: {
+            account: components["schemas"]["Account"];
+            notifications: components["schemas"]["NotificationPreferences"];
+            programs: components["schemas"]["AccountProgram"][];
+        };
+        AccountSettingsSave: {
+            name?: string;
+            notifications?: components["schemas"]["NotificationPreferences"];
+        };
+        MuteChange: {
+            muted: boolean;
+        };
+        /** @enum {string} */
+        InviteState: "pending" | "accepted" | "declined" | "expired";
+        Invite: {
+            token: string;
+            state: components["schemas"]["InviteState"];
+            /** Format: email */
+            email: string;
+            organisationName: string;
+            programName: string;
+            orgSlug: string;
+            programSlug: string;
+            role: components["schemas"]["Role"];
+            invitedByName: string;
+            /** @description An optional line from whoever sent it. */
+            message?: string | null;
+            /** Format: date-time */
+            expiresAt?: string | null;
+            /**
+             * @description Whether the invited address already belongs to an account. Decides
+             *     whether accepting joins an existing one or starts a new one, and the
+             *     screen says which so nobody fears a duplicate.
+             * @default false
+             */
+            hasAccount: boolean;
+        };
+        InviteResponse: {
+            accept: boolean;
+            /** @description Required when accepting without an existing account. */
+            name?: string | null;
+        };
+        InviteAccepted: {
+            session: components["schemas"]["Session"];
+            orgSlug: string;
+            programSlug: string;
         };
         ProfileView: {
             /** Format: uuid */
@@ -2752,6 +2969,223 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getAccountSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSettings"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    saveAccountSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountSettingsSave"];
+            };
+        };
+        responses: {
+            /** @description The saved settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listAccountPrograms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The programmes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountProgram"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    muteParticipation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MuteChange"];
+            };
+        };
+        responses: {
+            /** @description The updated membership */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountProgram"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    leaveProgram: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                participationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Left */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description A coordinator cannot leave their own programme this way */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invitation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Invite"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    respondToInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteResponse"];
+            };
+        };
+        responses: {
+            /**
+             * @description Accepted. A session is opened, so somebody arriving from an email
+             *     lands inside the programme rather than on a sign-in form.
+             */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InviteAccepted"];
+                };
+            };
+            /** @description Declined */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description The invitation has expired or was already used */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    requestNewInvite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The coordinator has been asked */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     getMyProfile: {

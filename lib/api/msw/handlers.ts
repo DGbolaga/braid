@@ -20,6 +20,40 @@ const requireSession = () => (db.signedIn ? null : unauthorized());
 const nextId = (kind: number) =>
   `${String(kind).padStart(8, "0")}-0000-4000-8000-${String(++db.seq).padStart(12, "0")}`;
 
+/**
+ * Unread counts and read-only state come from the strands the account holds.
+ * Only the seeded programme has any; the second participation is deliberately
+ * bare, so the screen has to cope with a programme that has nothing behind it.
+ */
+function accountPrograms(): S["AccountProgram"][] {
+  return db.session.participations.map((p) => {
+    const mine = p.programId === PROGRAM_ID;
+    const unread = mine
+      ? db.strandSummaries.reduce((n, s) => n + s.unreadCount, 0)
+      : 0;
+    return {
+      participationId: p.id,
+      programId: p.programId,
+      programName: p.programName,
+      organisationName: p.organisationName ?? "",
+      orgSlug: p.orgSlug,
+      programSlug: p.programSlug,
+      role: p.role,
+      status: p.status,
+      isCoordinator: p.isCoordinator ?? false,
+      muted: db.mutedParticipations.has(p.id),
+      unreadCount: unread,
+      readOnly: mine ? db.program.state === "closed" : false,
+    };
+  });
+}
+
+const accountSettings = (): S["AccountSettings"] => ({
+  account: db.session.account,
+  notifications: db.notifications,
+  programs: accountPrograms(),
+});
+
 /** The strand member record is where skills and headline already live. */
 const memberFor = (participationId: string) =>
   db.strands
@@ -817,6 +851,143 @@ export const handlers = [
     summary.endedAt = endedAt;
 
     return HttpResponse.json(full);
+  }),
+
+  http.get(url("/account/settings"), () => {
+    const denied = requireSession();
+    if (denied) return denied;
+    return HttpResponse.json(accountSettings());
+  }),
+
+  http.put(url("/account/settings"), async ({ request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+
+    const body = (await request.json()) as S["AccountSettingsSave"];
+    if (body?.name !== undefined) {
+      if (!body.name.trim()) {
+        return problem(400, "invalid_name", "Your name cannot be empty.");
+      }
+      db.session.account.name = body.name.trim();
+    }
+    if (body?.notifications) {
+      db.notifications = body.notifications;
+    }
+    return HttpResponse.json(accountSettings());
+  }),
+
+  http.get(url("/account/programs"), () => {
+    const denied = requireSession();
+    if (denied) return denied;
+    return HttpResponse.json(accountPrograms());
+  }),
+
+  http.put(url("/participations/:participationId/mute"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+
+    const id = String(params.participationId);
+    if (!db.session.participations.some((p) => p.id === id)) {
+      return notFound("programme");
+    }
+
+    const body = (await request.json()) as S["MuteChange"];
+    if (body?.muted) db.mutedParticipations.add(id);
+    else db.mutedParticipations.delete(id);
+
+    const updated = accountPrograms().find((p) => p.participationId === id);
+    return updated ? HttpResponse.json(updated) : notFound("programme");
+  }),
+
+  http.post(url("/participations/:participationId/leave"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+
+    const id = String(params.participationId);
+    const participation = db.session.participations.find((p) => p.id === id);
+    if (!participation) return notFound("programme");
+
+    if (participation.isCoordinator) {
+      return problem(
+        409,
+        "coordinator_cannot_leave",
+        "You coordinate this programme. Hand it over to somebody else first.",
+      );
+    }
+
+    db.session.participations = db.session.participations.filter(
+      (p) => p.id !== id,
+    );
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get(url("/invites/:token"), ({ params }) => {
+    const invite = db.invites.find((i) => i.token === params.token);
+    return invite ? HttpResponse.json(invite) : notFound("invitation");
+  }),
+
+  http.post(url("/invites/:token"), async ({ params, request }) => {
+    const invite = db.invites.find((i) => i.token === params.token);
+    if (!invite) return notFound("invitation");
+
+    if (invite.state !== "pending") {
+      return problem(
+        410,
+        "invite_spent",
+        invite.state === "expired"
+          ? "That invitation has expired."
+          : "That invitation has already been answered.",
+      );
+    }
+
+    const body = (await request.json()) as S["InviteResponse"];
+    if (!body?.accept) {
+      invite.state = "declined";
+      return new HttpResponse(null, { status: 204 });
+    }
+
+    if (!invite.hasAccount && !body.name?.trim()) {
+      return problem(400, "name_required", "Tell us what to call you.");
+    }
+
+    invite.state = "accepted";
+    db.signedIn = true;
+    if (!invite.hasAccount && body.name) {
+      db.session.account.name = body.name.trim();
+    }
+
+    // The invitation becomes a participation, which is what makes the
+    // programme reachable the moment they land in it.
+    if (!db.session.participations.some((p) => p.programSlug === invite.programSlug)) {
+      db.session.participations.push({
+        id: nextId(4),
+        programId: nextId(2),
+        programName: invite.programName,
+        organisationName: invite.organisationName,
+        orgSlug: invite.orgSlug,
+        programSlug: invite.programSlug,
+        role: invite.role,
+        status: "approved",
+        isCoordinator: false,
+      });
+    }
+
+    const accepted: S["InviteAccepted"] = {
+      session: db.session,
+      orgSlug: invite.orgSlug,
+      programSlug: invite.programSlug,
+    };
+    return HttpResponse.json(accepted, {
+      headers: {
+        "Set-Cookie": "braid_session=mock; HttpOnly; SameSite=Lax; Path=/",
+      },
+    });
+  }),
+
+  http.post(url("/invites/:token/reissue"), ({ params }) => {
+    const invite = db.invites.find((i) => i.token === params.token);
+    if (!invite) return notFound("invitation");
+    return new HttpResponse(null, { status: 202 });
   }),
 
   http.get(url("/programs/:programId/me"), ({ params }) => {

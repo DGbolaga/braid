@@ -1306,6 +1306,66 @@ export function createDb() {
     ),
   };
 
+  const notifications: S["NotificationPreferences"] = {
+    newMessage: true,
+    matchPublished: true,
+    milestoneReminders: true,
+    broadcasts: false,
+    digest: "weekly",
+  };
+
+  /**
+   * Invitations, one of each state worth building a screen for. The expired one
+   * exists so the recovery path is reachable without waiting a fortnight.
+   */
+  const invites: S["Invite"][] = [
+    {
+      token: "invite-pending",
+      state: "pending",
+      email: "chiamaka.eze@example.org",
+      organisationName: organisation.name,
+      programName: program.name,
+      orgSlug: ORG_SLUG,
+      programSlug: PROGRAM_SLUG,
+      role: "mentor",
+      invitedByName: "Amara Okonkwo",
+      message:
+        "You mentored two people informally last year and both of them said it changed the year for them. Would you do it properly with us?",
+      expiresAt: daysAhead(10),
+      hasAccount: false,
+    },
+    {
+      token: "invite-expired",
+      state: "expired",
+      email: "musa.danjuma@example.org",
+      organisationName: organisation.name,
+      programName: program.name,
+      orgSlug: ORG_SLUG,
+      programSlug: PROGRAM_SLUG,
+      role: "mentee",
+      invitedByName: "Ngozi Adeyemi",
+      message: null,
+      expiresAt: daysAgo(3),
+      hasAccount: false,
+    },
+    {
+      token: "invite-known",
+      state: "pending",
+      email: me.account.email,
+      organisationName: "University of Lagos",
+      programName: "Research writing, 2026",
+      orgSlug: "unilag",
+      programSlug: "research-writing-2026",
+      role: "mentor",
+      invitedByName: "Dr Kemi Balogun",
+      message: null,
+      expiresAt: daysAhead(21),
+      // Already has an account, so accepting joins it rather than making a
+      // second one under the same address.
+      hasAccount: true,
+    },
+  ];
+
   const session: S["Session"] = {
     account: me.account,
     participations: [
@@ -1354,6 +1414,10 @@ export function createDb() {
     report,
     resources,
     myAnswers,
+    notifications,
+    invites,
+    /** Muted programmes, by participation id. */
+    mutedParticipations: new Set<string>(),
     /** Architecture 4.9: the directory only exists when this is on. */
     selfMatchingEnabled: true,
     strandMetrics: metrics,

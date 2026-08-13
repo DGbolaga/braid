@@ -46,6 +46,10 @@ tags:
     description: |
       What a coordinator configures before a cohort runs: the programme arc and
       the messages it sends.
+  - name: Account
+    description: |
+      Scoped to the person, not to a programme. Everything here is true across
+      every programme they belong to.
   - name: Insight
     description: |
       The report a coordinator sends a funder, and the log that makes its
@@ -573,6 +577,204 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Problem"
+
+  /account/settings:
+    get:
+      operationId: getAccountSettings
+      tags: [Account]
+      summary: The account, how it wants to be contacted, and what it belongs to
+      responses:
+        "200":
+          description: The settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSettings"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    put:
+      operationId: saveAccountSettings
+      tags: [Account]
+      summary: Change the name or the notification preferences
+      description: |
+        There is no password here. Sign-in is by emailed link, so an account has
+        no password to change, and a settings screen offering one would be
+        describing a mechanism that does not exist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AccountSettingsSave"
+      responses:
+        "200":
+          description: The saved settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSettings"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /account/programs:
+    get:
+      operationId: listAccountPrograms
+      tags: [Account]
+      summary: Every programme this account belongs to
+      responses:
+        "200":
+          description: The programmes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AccountProgram"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /participations/{participationId}/mute:
+    parameters:
+      - name: participationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    put:
+      operationId: muteParticipation
+      tags: [Account]
+      summary: Stop or resume email from one programme
+      description: |
+        Muting silences the programme's email. It does not leave it, and the
+        strands stay live — somebody stepping back from their inbox has not
+        stepped back from their mentor.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MuteChange"
+      responses:
+        "200":
+          description: The updated membership
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountProgram"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /participations/{participationId}/leave:
+    parameters:
+      - name: participationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      operationId: leaveProgram
+      tags: [Account]
+      summary: Leave a programme
+      description: |
+        Ends the participation and any strand it holds. The conversation is
+        kept and the other side is told, because a strand that goes silent with
+        no explanation reads as being dropped.
+      responses:
+        "204":
+          description: Left
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: A coordinator cannot leave their own programme this way
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /invites/{token}:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: getInvite
+      tags: [Public]
+      summary: Read an invitation
+      description: |
+        Returns the invitation whatever state it is in, including expired. A
+        404 for a spent token would send somebody to a dead end when the useful
+        answer is that it lapsed and can be reissued.
+      security: []
+      responses:
+        "200":
+          description: The invitation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Invite"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: respondToInvite
+      tags: [Public]
+      summary: Accept or decline an invitation
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteResponse"
+      responses:
+        "200":
+          description: |
+            Accepted. A session is opened, so somebody arriving from an email
+            lands inside the programme rather than on a sign-in form.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteAccepted"
+        "204":
+          description: Declined
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "410":
+          description: The invitation has expired or was already used
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
+  /invites/{token}/reissue:
+    parameters:
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: requestNewInvite
+      tags: [Public]
+      summary: Ask the coordinator for a fresh invitation
+      description: |
+        What an expired invitation offers instead of a dead end. The coordinator
+        is told; no new token is minted here.
+      security: []
+      responses:
+        "202":
+          description: The coordinator has been asked
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /programs/{programId}/me:
     parameters:
@@ -2308,6 +2510,179 @@ components:
         joinedAt:
           type: string
           format: date-time
+
+    DigestFrequency:
+      type: string
+      enum: [off, daily, weekly]
+
+    NotificationPreferences:
+      type: object
+      required:
+        [newMessage, matchPublished, milestoneReminders, broadcasts, digest]
+      description: |
+        Per kind rather than one switch. Somebody who wants to know when their
+        mentor writes but not when the programme sends a newsletter should not
+        have to choose between both and neither.
+      properties:
+        newMessage:
+          type: boolean
+        matchPublished:
+          type: boolean
+        milestoneReminders:
+          type: boolean
+        broadcasts:
+          type: boolean
+        digest:
+          $ref: "#/components/schemas/DigestFrequency"
+
+    AccountProgram:
+      type: object
+      required:
+        [
+          participationId,
+          programId,
+          programName,
+          organisationName,
+          orgSlug,
+          programSlug,
+          role,
+          status,
+          muted,
+          unreadCount,
+          readOnly,
+        ]
+      properties:
+        participationId:
+          type: string
+          format: uuid
+        programId:
+          type: string
+          format: uuid
+        programName:
+          type: string
+        organisationName:
+          type: string
+        orgSlug:
+          type: string
+        programSlug:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        status:
+          $ref: "#/components/schemas/ParticipationStatus"
+        isCoordinator:
+          type: boolean
+        muted:
+          type: boolean
+        unreadCount:
+          type: integer
+        readOnly:
+          type: boolean
+          description: |
+            True once a cohort has finished. The programme stays open to read;
+            architecture 4.17 asks for exactly that rather than hiding it.
+
+    AccountSettings:
+      type: object
+      required: [account, notifications, programs]
+      properties:
+        account:
+          $ref: "#/components/schemas/Account"
+        notifications:
+          $ref: "#/components/schemas/NotificationPreferences"
+        programs:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountProgram"
+
+    AccountSettingsSave:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        notifications:
+          $ref: "#/components/schemas/NotificationPreferences"
+
+    MuteChange:
+      type: object
+      required: [muted]
+      properties:
+        muted:
+          type: boolean
+
+    InviteState:
+      type: string
+      enum: [pending, accepted, declined, expired]
+
+    Invite:
+      type: object
+      required:
+        [
+          token,
+          state,
+          email,
+          organisationName,
+          programName,
+          orgSlug,
+          programSlug,
+          role,
+          invitedByName,
+        ]
+      properties:
+        token:
+          type: string
+        state:
+          $ref: "#/components/schemas/InviteState"
+        email:
+          type: string
+          format: email
+        organisationName:
+          type: string
+        programName:
+          type: string
+        orgSlug:
+          type: string
+        programSlug:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        invitedByName:
+          type: string
+        message:
+          type: [string, "null"]
+          description: An optional line from whoever sent it.
+        expiresAt:
+          type: [string, "null"]
+          format: date-time
+        hasAccount:
+          type: boolean
+          default: false
+          description: |
+            Whether the invited address already belongs to an account. Decides
+            whether accepting joins an existing one or starts a new one, and the
+            screen says which so nobody fears a duplicate.
+
+    InviteResponse:
+      type: object
+      required: [accept]
+      properties:
+        accept:
+          type: boolean
+        name:
+          type: [string, "null"]
+          description: Required when accepting without an existing account.
+
+    InviteAccepted:
+      type: object
+      required: [session, orgSlug, programSlug]
+      properties:
+        session:
+          $ref: "#/components/schemas/Session"
+        orgSlug:
+          type: string
+        programSlug:
+          type: string
 
     ProfileView:
       type: object
