@@ -5,6 +5,11 @@ import type { Schemas } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { Field, TextareaField } from "@/components/ui/input";
+import {
+  insertAtCursor,
+  resolveMergeCodes,
+  unknownMergeCodes,
+} from "@/lib/comms/merge-codes";
 import { resetTemplate, saveTemplate } from "./actions";
 
 type Template = Schemas["MessageTemplate"];
@@ -66,19 +71,11 @@ export function TemplatesEditor({
    * code mid-sentence, and appending would put it at the end of the message.
    */
   const insert = (code: string) => {
-    const textarea = bodyRef.current;
-    const token = `{${code}}`;
-    if (!textarea) {
-      update({ body: `${draft.body}${token}` });
-      return;
-    }
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const next = draft.body.slice(0, start) + token + draft.body.slice(end);
-    update({ body: next });
+    const { text, caret } = insertAtCursor(bodyRef.current, draft.body, code);
+    update({ body: text });
     requestAnimationFrame(() => {
-      textarea.focus();
-      textarea.setSelectionRange(start + token.length, start + token.length);
+      bodyRef.current?.focus();
+      bodyRef.current?.setSelectionRange(caret, caret);
     });
   };
 
@@ -244,12 +241,8 @@ export function TemplatesEditor({
   );
 }
 
-/**
- * The preview resolves codes with samples the API supplies, so it shows the
- * same substitution the sender will make rather than one the browser invented.
- * An unknown code is left visible rather than blanked — seeing {mentor.name}
- * survive the preview is how a coordinator learns it is not a real code.
- */
+/** Substitution and validation live in lib/comms, so this and the broadcast
+ *  composer cannot disagree about what a valid code is. */
 function Preview({
   subject,
   body,
@@ -259,13 +252,8 @@ function Preview({
   body: string;
   mergeCodes: Schemas["MergeCode"][];
 }) {
-  const samples = new Map(mergeCodes.map((c) => [c.code, c.sample]));
-  const resolve = (text: string) =>
-    text.replace(/\{([^}]+)\}/g, (whole, code) => samples.get(code.trim()) ?? whole);
-
-  const unknown = [...body.matchAll(/\{([^}]+)\}/g)]
-    .map((m) => m[1].trim())
-    .filter((c) => !samples.has(c));
+  const resolve = (text: string) => resolveMergeCodes(text, mergeCodes);
+  const unknown = unknownMergeCodes(body, mergeCodes);
 
   return (
     <section className="flex flex-col gap-12 rounded-lg border border-subtle bg-sunken p-24">

@@ -20,6 +20,80 @@ const requireSession = () => (db.signedIn ? null : unauthorized());
 const nextId = (kind: number) =>
   `${String(kind).padStart(8, "0")}-0000-4000-8000-${String(++db.seq).padStart(12, "0")}`;
 
+const SEGMENTS: S["BroadcastSegment"][] = [
+  "everyone",
+  "mentors",
+  "mentees",
+  "unmatched",
+  "quiet_strands",
+  "incomplete_profiles",
+];
+
+/** Sizes are counted now, from the same data the monitor reads. */
+function segmentSize(segment: S["BroadcastSegment"]) {
+  switch (segment) {
+    case "everyone":
+      return db.roster.length;
+    case "mentors":
+      return db.roster.filter((r) => r.role === "mentor").length;
+    case "mentees":
+      return db.roster.filter((r) => r.role === "mentee").length;
+    case "unmatched":
+      return db.unmatched.length;
+    case "quiet_strands":
+      return db.strandSummaries
+        .map(toMonitorEntry)
+        .filter(
+          (e) =>
+            e.state === "active" &&
+            (e.health === "quiet" || e.health === "not_started"),
+        )
+        // Both sides of a quiet strand hear about it.
+        .reduce((n, e) => n + e.members.length, 0);
+    case "incomplete_profiles":
+      return db.roster.filter((r) => r.profileCompleteness < 0.6).length;
+  }
+}
+
+/** Questions on the live form carrying a given flag, for both roles. */
+function publishedFields(
+  predicate: (field: S["FormField"]) => boolean,
+): S["CriteriaField"][] {
+  const out: S["CriteriaField"][] = [];
+  for (const role of ["mentee", "mentor"] as const) {
+    const version = publishedVersion(role);
+    if (!version) continue;
+    for (const section of version.sections) {
+      for (const field of section.fields) {
+        if (!predicate(field)) continue;
+        out.push({
+          fieldId: field.id,
+          label: field.label,
+          role,
+          type: field.type,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+function badRecipe(recipe: S["MatchingRecipeSave"]): string | null {
+  if (!recipe?.name?.trim()) return "The recipe needs a name.";
+  if (!Array.isArray(recipe.weights)) return "Send the whole recipe.";
+  const floor = recipe.fairness?.coverageFloor;
+  if (typeof floor !== "number" || floor < 0 || floor > 1) {
+    return "The coverage floor is a share between 0 and 100 percent.";
+  }
+  if (recipe.weights.some((w) => w.weight < 0 || w.weight > 100)) {
+    return "Weights run from 0 to 100.";
+  }
+  if (recipe.weights.every((w) => w.weight === 0)) {
+    return "Every weight is zero, so nothing would score. Give at least one question some weight.";
+  }
+  return null;
+}
+
 /** The live form for a role: the newest published version, not merely a published one. */
 const publishedVersion = (role: S["Role"]) =>
   db.formVersions
@@ -650,6 +724,161 @@ export const handlers = [
     summary.endedAt = endedAt;
 
     return HttpResponse.json(full);
+  }),
+
+  http.get(url("/programs/:programId/criteria"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body: S["CriteriaEditorState"] = {
+      recipe: db.recipe,
+      matchingFields: publishedFields((f) => f.matching),
+      equityFields: publishedFields((f) => f.equity),
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.put(url("/programs/:programId/criteria"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body = (await request.json()) as S["MatchingRecipeSave"];
+    const complaint = badRecipe(body);
+    if (complaint) return problem(400, "invalid_recipe", complaint);
+
+    db.recipe = {
+      ...db.recipe,
+      name: body.name.trim(),
+      version: db.recipe.version + 1,
+      hardConstraints: body.hardConstraints,
+      weights: body.weights,
+      fairness: body.fairness,
+      updatedAt: new Date().toISOString(),
+      updatedBy: db.session.account.name,
+    };
+    return HttpResponse.json(db.recipe);
+  }),
+
+  http.post(url("/programs/:programId/criteria/test-run"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body = (await request.json()) as S["MatchingRecipeSave"];
+    const complaint = badRecipe(body);
+    if (complaint) return problem(400, "invalid_recipe", complaint);
+
+    /**
+     * The fairness summary and nothing else. No pairs leave this endpoint, per
+     * 5.5 — tuning weights while watching individual matches is how a cohort
+     * gets optimised for one person.
+     *
+     * The mock moves coverage with the recipe so the screen has something
+     * honest to show: more hard constraints shrink the pool, and a heavier
+     * priority weight lifts the low band at the top band's expense.
+     */
+    const template = db.runs.find((r) => r.fairnessSummary !== null);
+    const base = template?.fairnessSummary;
+    if (!base) return notFound("fairness summary");
+
+    const constraints = body.hardConstraints.filter((c) => c.enabled).length;
+    const priority =
+      body.fairness.priorityWeights.reduce((n, w) => n + w.weight, 0) /
+      Math.max(body.fairness.priorityWeights.length * 100, 1);
+
+    const matched = Math.max(
+      0,
+      Math.min(
+        base.totalMentees,
+        Math.round(base.totalMentees * (1 - constraints * 0.06)),
+      ),
+    );
+
+    const shift = (band: S["PriorityBandStat"]): S["PriorityBandStat"] => {
+      const pull = band.band === "high" ? priority * 0.12 : -priority * 0.05;
+      return {
+        ...band,
+        meanScore: Number(Math.min(1, band.meanScore + pull).toFixed(3)),
+        medianScore: Number(Math.min(1, band.medianScore + pull).toFixed(3)),
+      };
+    };
+
+    const summary: S["FairnessSummary"] = {
+      ...base,
+      matchedCount: matched,
+      unmatchedCount: base.totalMentees - matched,
+      coverageRate: Number((matched / base.totalMentees).toFixed(4)),
+      priorityBands: base.priorityBands.map(shift),
+    };
+    return HttpResponse.json(summary);
+  }),
+
+  http.get(url("/programs/:programId/broadcasts"), ({ params }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body: S["BroadcastListing"] = {
+      items: [...db.broadcasts].sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
+      segments: SEGMENTS.map((segment) => ({
+        segment,
+        count: segmentSize(segment),
+      })),
+      mergeCodes: db.mergeCodes,
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.post(url("/programs/:programId/broadcasts"), async ({ params, request }) => {
+    const denied = requireSession();
+    if (denied) return denied;
+    if (params.programId !== PROGRAM_ID) return notFound("programme");
+
+    const body = (await request.json()) as S["BroadcastCreate"];
+    if (!body?.subject?.trim() || !body?.body?.trim()) {
+      return problem(400, "invalid_body", "A message needs a subject and a body.");
+    }
+
+    const unknown = unknownCodes(`${body.subject} ${body.body}`);
+    if (unknown.length > 0) {
+      return problem(
+        400,
+        "unknown_merge_code",
+        `There is no such code as {${unknown[0]}}. Use one from the list.`,
+      );
+    }
+
+    const count = segmentSize(body.segment);
+    if (count === 0) {
+      // Refused rather than sent to nobody: a send that reached zero people
+      // still appears in the history as a send, and the coordinator would
+      // believe the message went out.
+      return problem(
+        400,
+        "empty_segment",
+        "Nobody is in that group right now, so there is nobody to write to.",
+      );
+    }
+
+    const created: S["Broadcast"] = {
+      id: nextId(14),
+      segment: body.segment,
+      subject: body.subject,
+      body: body.body,
+      recipientCount: count,
+      state: body.scheduledFor ? "scheduled" : "sent",
+      createdAt: new Date().toISOString(),
+      createdBy: db.session.account.name,
+      scheduledFor: body.scheduledFor ?? null,
+      deliveredCount: body.scheduledFor ? 0 : count,
+      failedCount: 0,
+    };
+    db.broadcasts.push(created);
+    return HttpResponse.json(created, { status: 202 });
   }),
 
   http.get(url("/programs/:programId/forms"), ({ params, request }) => {

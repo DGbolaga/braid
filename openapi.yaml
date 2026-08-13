@@ -46,6 +46,8 @@ tags:
     description: |
       What a coordinator configures before a cohort runs: the programme arc and
       the messages it sends.
+  - name: Comms
+    description: Messages sent to a segment of the programme at once.
   - name: Monitoring
     description: |
       Programme health while a cohort is live, and the strands it is made of.
@@ -567,6 +569,147 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Problem"
+
+  /programs/{programId}/criteria:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: getCriteria
+      tags: [Setup]
+      summary: The matching recipe, and the questions it can be built from
+      description: |
+        Coupled to the published form on purpose: a weight can only exist for a
+        question that is actually asked, and a question flagged for matching but
+        left unweighted is a question collected for nothing. Both are reported
+        here rather than left for the coordinator to notice.
+      responses:
+        "200":
+          description: The recipe and the fields available to it
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CriteriaEditorState"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: saveCriteria
+      tags: [Setup]
+      summary: Save the recipe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchingRecipeSave"
+      responses:
+        "200":
+          description: The saved recipe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchingRecipe"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/criteria/test-run:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    post:
+      operationId: testRunCriteria
+      tags: [Setup]
+      summary: Score the current roster without drafting anything
+      description: |
+        Returns the fairness summary and nothing else. No pairs, deliberately:
+        architecture 5.5 requires that weight tuning is not driven by looking at
+        individual matches, for the same reason the run review puts the summary
+        above the names. A coordinator who tunes until one particular pair
+        appears has optimised the cohort for one person.
+
+        Nothing is stored. This is not a run.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchingRecipeSave"
+      responses:
+        "200":
+          description: What this recipe would produce
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FairnessSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /programs/{programId}/broadcasts:
+    parameters:
+      - $ref: "#/components/parameters/ProgramId"
+    get:
+      operationId: listBroadcasts
+      tags: [Comms]
+      summary: What has been sent, and who each segment reaches now
+      responses:
+        "200":
+          description: Send history and current segment sizes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastListing"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    post:
+      operationId: sendBroadcast
+      tags: [Comms]
+      summary: Send or schedule a message to a segment
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Broadcast"
+        "400":
+          description: |
+            An unknown merge code, an empty message, or a segment that currently
+            contains nobody. The last is refused rather than sent to zero
+            people, because a send that reaches nobody still reads as sent.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastCreate"
 
   /programs/{programId}/forms:
     parameters:
@@ -1939,6 +2082,249 @@ components:
         joinedAt:
           type: string
           format: date-time
+
+    HardConstraintKind:
+      type: string
+      description: |
+        A pair that fails an enabled constraint is never proposed, whatever it
+        scores. Kept few and blunt on purpose: every constraint added here
+        shrinks the pool, and a shrunken pool is what produces unmatched people.
+      enum: [same_timezone_band, shared_skill, different_team, role_compatible]
+
+    HardConstraint:
+      type: object
+      required: [kind, enabled]
+      properties:
+        kind:
+          $ref: "#/components/schemas/HardConstraintKind"
+        enabled:
+          type: boolean
+
+    WeightDirection:
+      type: string
+      description: |
+        `similar` rewards two people answering alike; `complementary` rewards
+        them answering differently. Skills usually want complementary — a mentor
+        who already knows what the mentee knows teaches them nothing — and
+        availability usually wants similar.
+      enum: [similar, complementary]
+
+    FieldWeight:
+      type: object
+      required: [fieldId, weight, direction]
+      properties:
+        fieldId:
+          type: string
+          format: uuid
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Zero means the question is collected but does not score.
+        direction:
+          $ref: "#/components/schemas/WeightDirection"
+
+    PriorityWeight:
+      type: object
+      required: [fieldId, weight]
+      properties:
+        fieldId:
+          type: string
+          format: uuid
+        weight:
+          type: integer
+          minimum: 0
+          maximum: 100
+
+    FairnessRules:
+      type: object
+      required: [coverageFloor, priorityWeights]
+      properties:
+        mentorCapacityCap:
+          type: [integer, "null"]
+          description: |
+            A ceiling over what mentors set for themselves. Null respects each
+            mentor's own number.
+        coverageFloor:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: |
+            The share of mentees a run must place before it is worth reviewing.
+            A recipe tuned for quality alone will happily match six people
+            perfectly and leave thirty out.
+        priorityWeights:
+          type: array
+          items:
+            $ref: "#/components/schemas/PriorityWeight"
+
+    MatchingRecipe:
+      type: object
+      required: [name, version, hardConstraints, weights, fairness]
+      properties:
+        name:
+          type: string
+        version:
+          type: integer
+        hardConstraints:
+          type: array
+          items:
+            $ref: "#/components/schemas/HardConstraint"
+        weights:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldWeight"
+        fairness:
+          $ref: "#/components/schemas/FairnessRules"
+        updatedAt:
+          type: [string, "null"]
+          format: date-time
+        updatedBy:
+          type: [string, "null"]
+
+    MatchingRecipeSave:
+      type: object
+      required: [name, hardConstraints, weights, fairness]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        hardConstraints:
+          type: array
+          items:
+            $ref: "#/components/schemas/HardConstraint"
+        weights:
+          type: array
+          items:
+            $ref: "#/components/schemas/FieldWeight"
+        fairness:
+          $ref: "#/components/schemas/FairnessRules"
+
+    CriteriaField:
+      type: object
+      required: [fieldId, label, role, type]
+      description: A question from the published form that a weight may refer to.
+      properties:
+        fieldId:
+          type: string
+          format: uuid
+        label:
+          type: string
+        role:
+          $ref: "#/components/schemas/Role"
+        type:
+          $ref: "#/components/schemas/FormFieldType"
+
+    CriteriaEditorState:
+      type: object
+      required: [recipe, matchingFields, equityFields]
+      properties:
+        recipe:
+          $ref: "#/components/schemas/MatchingRecipe"
+        matchingFields:
+          type: array
+          description: Published questions flagged for matching.
+          items:
+            $ref: "#/components/schemas/CriteriaField"
+        equityFields:
+          type: array
+          description: Published questions flagged for priority.
+          items:
+            $ref: "#/components/schemas/CriteriaField"
+
+    BroadcastSegment:
+      type: string
+      enum:
+        [
+          everyone,
+          mentors,
+          mentees,
+          unmatched,
+          quiet_strands,
+          incomplete_profiles,
+        ]
+
+    SegmentCount:
+      type: object
+      required: [segment, count]
+      properties:
+        segment:
+          $ref: "#/components/schemas/BroadcastSegment"
+        count:
+          type: integer
+
+    BroadcastState:
+      type: string
+      enum: [scheduled, sending, sent]
+
+    Broadcast:
+      type: object
+      required:
+        [id, segment, subject, body, recipientCount, state, createdAt, createdBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        segment:
+          $ref: "#/components/schemas/BroadcastSegment"
+        subject:
+          type: string
+        body:
+          type: string
+        recipientCount:
+          type: integer
+          description: |
+            Counted when it was sent, not now. A segment's size changes, and a
+            history that recomputed it would rewrite what happened.
+        state:
+          $ref: "#/components/schemas/BroadcastState"
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        scheduledFor:
+          type: [string, "null"]
+          format: date-time
+        deliveredCount:
+          type: integer
+        failedCount:
+          type: integer
+
+    BroadcastCreate:
+      type: object
+      required: [segment, subject, body]
+      properties:
+        segment:
+          $ref: "#/components/schemas/BroadcastSegment"
+        subject:
+          type: string
+          minLength: 1
+        body:
+          type: string
+          minLength: 1
+        scheduledFor:
+          type: [string, "null"]
+          format: date-time
+          description: Null sends now.
+
+    BroadcastListing:
+      type: object
+      required: [items, segments, mergeCodes]
+      properties:
+        items:
+          type: array
+          description: Newest first.
+          items:
+            $ref: "#/components/schemas/Broadcast"
+        segments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SegmentCount"
+        mergeCodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/MergeCode"
 
     FormVersionSummary:
       type: object

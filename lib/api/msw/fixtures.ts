@@ -1012,6 +1012,74 @@ export function createDb() {
     },
   ];
 
+  /**
+   * The recipe that produced the seeded run. Weights refer to published field
+   * ids, so the criteria screen and the form builder are looking at the same
+   * questions.
+   */
+  const recipe: S["MatchingRecipe"] = {
+    name: "Cohort 4 recipe",
+    version: 4,
+    hardConstraints: [
+      { kind: "role_compatible", enabled: true },
+      { kind: "shared_skill", enabled: true },
+      { kind: "same_timezone_band", enabled: false },
+      { kind: "different_team", enabled: false },
+    ],
+    weights: [
+      // Where they are based: overlapping working hours, so similar.
+      { fieldId: field(2), weight: 40, direction: "similar" },
+      // What they want to work on against what the mentor can help with: the
+      // whole point is that the mentor knows what the mentee does not.
+      { fieldId: field(7), weight: 90, direction: "complementary" },
+      { fieldId: field(8), weight: 55, direction: "similar" },
+      { fieldId: field(10), weight: 30, direction: "similar" },
+      { fieldId: field(21), weight: 25, direction: "complementary" },
+      { fieldId: field(22), weight: 85, direction: "complementary" },
+      { fieldId: field(24), weight: 15, direction: "similar" },
+    ],
+    fairness: {
+      mentorCapacityCap: null,
+      coverageFloor: 0.8,
+      priorityWeights: [
+        { fieldId: field(4), weight: 60 },
+        { fieldId: field(5), weight: 45 },
+        { fieldId: field(9), weight: 35 },
+      ],
+    },
+    updatedAt: daysAgo(9),
+    updatedBy: "Amara Okonkwo",
+  };
+
+  const broadcasts: S["Broadcast"][] = [
+    {
+      id: uuid(14, 1),
+      segment: "everyone",
+      subject: "Matching runs on 14 September",
+      body: "Hello {participant.firstName},\n\nMatching for {programme.name} runs on 14 September. If your profile is not finished, this week is the week.",
+      recipientCount: 24,
+      state: "sent",
+      createdAt: daysAgo(12),
+      createdBy: "Amara Okonkwo",
+      scheduledFor: null,
+      deliveredCount: 24,
+      failedCount: 0,
+    },
+    {
+      id: uuid(14, 2),
+      segment: "incomplete_profiles",
+      subject: "Ten minutes on your profile",
+      body: "Hello {participant.firstName},\n\nYour profile is not finished, and matching works on what you tell us. Ten minutes now is the difference between a good match and a guess.",
+      recipientCount: 6,
+      state: "sent",
+      createdAt: daysAgo(5),
+      createdBy: "Amara Okonkwo",
+      scheduledFor: null,
+      deliveredCount: 5,
+      failedCount: 1,
+    },
+  ];
+
   const session: S["Session"] = {
     account: me.account,
     participations: [
@@ -1054,6 +1122,8 @@ export function createDb() {
     applications,
     unmatched,
     milestones,
+    recipe,
+    broadcasts,
     strandMetrics: metrics,
     /** Structured clone so resetting a template can restore untouched text. */
     templates: DEFAULT_TEMPLATES.map((t) => ({ ...t })),

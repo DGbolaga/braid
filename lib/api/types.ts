@@ -395,6 +395,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/programs/{programId}/criteria": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The matching recipe, and the questions it can be built from
+         * @description Coupled to the published form on purpose: a weight can only exist for a
+         *     question that is actually asked, and a question flagged for matching but
+         *     left unweighted is a question collected for nothing. Both are reported
+         *     here rather than left for the coordinator to notice.
+         */
+        get: operations["getCriteria"];
+        /** Save the recipe */
+        put: operations["saveCriteria"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/criteria/test-run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Score the current roster without drafting anything
+         * @description Returns the fairness summary and nothing else. No pairs, deliberately:
+         *     architecture 5.5 requires that weight tuning is not driven by looking at
+         *     individual matches, for the same reason the run review puts the summary
+         *     above the names. A coordinator who tunes until one particular pair
+         *     appears has optimised the cohort for one person.
+         *
+         *     Nothing is stored. This is not a run.
+         */
+        post: operations["testRunCriteria"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/programs/{programId}/broadcasts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        /** What has been sent, and who each segment reaches now */
+        get: operations["listBroadcasts"];
+        put?: never;
+        /** Send or schedule a message to a segment */
+        post: operations["sendBroadcast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/programs/{programId}/forms": {
         parameters: {
             query?: never;
@@ -1140,6 +1214,126 @@ export interface components {
             timezone?: string | null;
             /** Format: date-time */
             joinedAt: string;
+        };
+        /**
+         * @description A pair that fails an enabled constraint is never proposed, whatever it
+         *     scores. Kept few and blunt on purpose: every constraint added here
+         *     shrinks the pool, and a shrunken pool is what produces unmatched people.
+         * @enum {string}
+         */
+        HardConstraintKind: "same_timezone_band" | "shared_skill" | "different_team" | "role_compatible";
+        HardConstraint: {
+            kind: components["schemas"]["HardConstraintKind"];
+            enabled: boolean;
+        };
+        /**
+         * @description `similar` rewards two people answering alike; `complementary` rewards
+         *     them answering differently. Skills usually want complementary — a mentor
+         *     who already knows what the mentee knows teaches them nothing — and
+         *     availability usually wants similar.
+         * @enum {string}
+         */
+        WeightDirection: "similar" | "complementary";
+        FieldWeight: {
+            /** Format: uuid */
+            fieldId: string;
+            /** @description Zero means the question is collected but does not score. */
+            weight: number;
+            direction: components["schemas"]["WeightDirection"];
+        };
+        PriorityWeight: {
+            /** Format: uuid */
+            fieldId: string;
+            weight: number;
+        };
+        FairnessRules: {
+            /**
+             * @description A ceiling over what mentors set for themselves. Null respects each
+             *     mentor's own number.
+             */
+            mentorCapacityCap?: number | null;
+            /**
+             * @description The share of mentees a run must place before it is worth reviewing.
+             *     A recipe tuned for quality alone will happily match six people
+             *     perfectly and leave thirty out.
+             */
+            coverageFloor: number;
+            priorityWeights: components["schemas"]["PriorityWeight"][];
+        };
+        MatchingRecipe: {
+            name: string;
+            version: number;
+            hardConstraints: components["schemas"]["HardConstraint"][];
+            weights: components["schemas"]["FieldWeight"][];
+            fairness: components["schemas"]["FairnessRules"];
+            /** Format: date-time */
+            updatedAt?: string | null;
+            updatedBy?: string | null;
+        };
+        MatchingRecipeSave: {
+            name: string;
+            hardConstraints: components["schemas"]["HardConstraint"][];
+            weights: components["schemas"]["FieldWeight"][];
+            fairness: components["schemas"]["FairnessRules"];
+        };
+        /** @description A question from the published form that a weight may refer to. */
+        CriteriaField: {
+            /** Format: uuid */
+            fieldId: string;
+            label: string;
+            role: components["schemas"]["Role"];
+            type: components["schemas"]["FormFieldType"];
+        };
+        CriteriaEditorState: {
+            recipe: components["schemas"]["MatchingRecipe"];
+            /** @description Published questions flagged for matching. */
+            matchingFields: components["schemas"]["CriteriaField"][];
+            /** @description Published questions flagged for priority. */
+            equityFields: components["schemas"]["CriteriaField"][];
+        };
+        /** @enum {string} */
+        BroadcastSegment: "everyone" | "mentors" | "mentees" | "unmatched" | "quiet_strands" | "incomplete_profiles";
+        SegmentCount: {
+            segment: components["schemas"]["BroadcastSegment"];
+            count: number;
+        };
+        /** @enum {string} */
+        BroadcastState: "scheduled" | "sending" | "sent";
+        Broadcast: {
+            /** Format: uuid */
+            id: string;
+            segment: components["schemas"]["BroadcastSegment"];
+            subject: string;
+            body: string;
+            /**
+             * @description Counted when it was sent, not now. A segment's size changes, and a
+             *     history that recomputed it would rewrite what happened.
+             */
+            recipientCount: number;
+            state: components["schemas"]["BroadcastState"];
+            /** Format: date-time */
+            createdAt: string;
+            createdBy: string;
+            /** Format: date-time */
+            scheduledFor?: string | null;
+            deliveredCount?: number;
+            failedCount?: number;
+        };
+        BroadcastCreate: {
+            segment: components["schemas"]["BroadcastSegment"];
+            subject: string;
+            body: string;
+            /**
+             * Format: date-time
+             * @description Null sends now.
+             */
+            scheduledFor?: string | null;
+        };
+        BroadcastListing: {
+            /** @description Newest first. */
+            items: components["schemas"]["Broadcast"][];
+            segments: components["schemas"]["SegmentCount"][];
+            mergeCodes: components["schemas"]["MergeCode"][];
         };
         FormVersionSummary: {
             /** Format: uuid */
@@ -2240,6 +2434,158 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    getCriteria: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The recipe and the fields available to it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CriteriaEditorState"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveCriteria: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchingRecipeSave"];
+            };
+        };
+        responses: {
+            /** @description The saved recipe */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchingRecipe"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    testRunCriteria: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MatchingRecipeSave"];
+            };
+        };
+        responses: {
+            /** @description What this recipe would produce */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FairnessSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listBroadcasts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Send history and current segment sizes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BroadcastListing"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    sendBroadcast: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                programId: components["parameters"]["ProgramId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BroadcastCreate"];
+            };
+        };
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Broadcast"];
+                };
+            };
+            /**
+             * @description An unknown merge code, an empty message, or a segment that currently
+             *     contains nobody. The last is refused rather than sent to zero
+             *     people, because a send that reaches nobody still reads as sent.
+             */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     getFormEditorState: {
