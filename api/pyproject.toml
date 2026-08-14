@@ -32,5 +32,18 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
+[tool.ruff.lint.flake8-bugbear]
+# B008 warns about function calls in argument defaults, which is exactly how
+# FastAPI declares dependencies and query parameters. These are evaluated once
+# and never mutated, so the rule does not apply to them.
+extend-immutable-calls = [
+    "fastapi.Query",
+    "fastapi.Path",
+    "fastapi.Body",
+    "fastapi.Cookie",
+    "fastapi.Header",
+    "fastapi.Depends",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["."]
