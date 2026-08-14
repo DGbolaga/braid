@@ -33,6 +33,7 @@ from app.schemas.matching import (
     RunOut,
     RunPageOut,
 )
+from app.services import explain
 
 router = APIRouter(tags=["Matching"])
 
@@ -71,6 +72,7 @@ def _detail(db: Session, run: Run) -> RunDetailOut:
         p.mentor_participation_id for p in pairs
     }
     people = _people(db, ids)
+    explanations = explain.explain(db, run, pairs)
 
     def ref(participation_id: uuid.UUID) -> PersonRefOut:
         name, photo = people.get(participation_id, ("Someone", None))
@@ -88,8 +90,13 @@ def _detail(db: Session, run: Run) -> RunDetailOut:
                 mentor=ref(pair.mentor_participation_id),
                 score=pair.score,
                 priority_band=pair.priority_band,
+                score_breakdown=reasons.score_breakdown,
+                unscored=reasons.unscored,
+                priority_score=reasons.priority_score,
+                priority_breakdown=reasons.priority_breakdown,
             )
             for pair in pairs
+            for reasons in [explanations.get(pair.id, explain.PairExplanation())]
         ],
         unmatched_count=len(run.unmatched),
     )

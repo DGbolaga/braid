@@ -2261,6 +2261,27 @@ export interface components {
             priorityBands: components["schemas"]["PriorityBandStat"][];
             scoreDistribution: components["schemas"]["ScoreBucket"][];
         };
+        /** @description One scored question's contribution to a pair's fit, with both sides' answers so a coordinator can see what was compared rather than only the number it produced. */
+        ScoreContribution: {
+            /** Format: uuid */
+            fieldId: string;
+            label: string;
+            weight: number;
+            /** @enum {string} */
+            direction: "similar" | "complementary";
+            contribution: number;
+            menteeAnswer?: string | null;
+            mentorAnswer?: string | null;
+        };
+        /** @description One equity question's contribution to the mentee's priority score. Scales are inverted before they arrive here, so a higher value always means less existing access. */
+        PriorityContribution: {
+            /** Format: uuid */
+            fieldId: string;
+            label: string;
+            weight: number;
+            value: number;
+            answer?: string | null;
+        };
         DraftPair: {
             /** Format: uuid */
             id: string;
@@ -2268,6 +2289,12 @@ export interface components {
             mentor: components["schemas"]["PersonRef"];
             score: number;
             priorityBand: components["schemas"]["PriorityBand"];
+            /** @description Questions that produced a comparable number, highest weight first. */
+            scoreBreakdown?: components["schemas"]["ScoreContribution"][];
+            /** @description Labels of scored questions that could not be compared for this pair, usually free text with no taxonomy behind it. Named rather than hidden, because they are the difference between the score shown and a score over every configured question. */
+            unscored?: string[];
+            priorityScore?: number | null;
+            priorityBreakdown?: components["schemas"]["PriorityContribution"][];
         };
         Run: {
             /** Format: uuid */
