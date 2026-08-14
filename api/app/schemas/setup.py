@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
+from pydantic import ConfigDict
+
 from app.enums import (
     ApplicationStatus,
     DecisionKind,
@@ -38,7 +40,20 @@ class ApplicationSummaryOut(Wire):
 
 class ApplicationCountsOut(Wire):
     """The whole queue's shape, independent of the current filter, so the tabs
-    can carry counts without a request each."""
+    can carry counts without a request each.
+
+    Keys stay snake_case: they are ApplicationStatus values, not field names,
+    and the contract spells them the way the enum does. Camel-casing them turns
+    `under_review` into `underReview`, which the frontend then reads as
+    undefined and renders as a blank count.
+    """
+
+    model_config = ConfigDict(
+        alias_generator=None,
+        serialize_by_alias=False,
+        populate_by_name=True,
+        from_attributes=True,
+    )
 
     submitted: int = 0
     under_review: int = 0

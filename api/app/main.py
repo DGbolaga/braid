@@ -9,6 +9,7 @@ from app.routers import (
     applications,
     auth,
     matching,
+    monitoring,
     participant,
     public,
     roster,
@@ -70,8 +71,12 @@ for router in (
     unmatched,
     applications,
     setup,
+    monitoring,
 ):
     app.include_router(router.router, prefix=V1)
+
+# Broadcast lives in the monitoring module but is its own contract tag.
+app.include_router(monitoring.comms, prefix=V1)
 
 
 @app.get("/health", tags=["Meta"])
