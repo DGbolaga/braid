@@ -62,6 +62,12 @@ from the sign-in screen.
 | Roster | `/admin/o/she-code-africa/programs/{programId}/roster` |
 | **Matching runs — start, watch, publish** | `…/programs/{programId}/runs` |
 | **Unmatched queue and pairing by hand** | `…/programs/{programId}/unmatched` |
+| Applications review and decisions | `…/programs/{programId}/applications` |
+| Form builder — draft and publish | `…/programs/{programId}/form` |
+| Matching criteria and test run | `…/programs/{programId}/criteria` |
+| Milestones | `…/programs/{programId}/milestones` |
+| Templates | `…/programs/{programId}/templates` |
+| Research writing programme (a second org, different form) | `/o/unilag/p/research-writing-2026` |
 
 `programId` is `00000002-0000-4000-8000-000000000001`.
 
@@ -79,8 +85,6 @@ Then press **Publish** and the strands appear on the participant side.
 These screens still show an error against the real API. Switch
 `NEXT_PUBLIC_API_MOCKING=enabled` to see them working against the mock.
 
-- Applications review and decisions
-- Form builder, matching criteria, milestones, templates
 - Dashboard, strands monitor, broadcast
 - Reports, audit log
 - Account settings and my programmes
