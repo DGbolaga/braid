@@ -13,7 +13,9 @@ services:
       POSTGRES_PASSWORD: braid
       POSTGRES_DB: braid
     ports:
-      - "5432:5432"
+      # Override when the host already runs Postgres on 5432:
+      #   DB_PORT=5433 docker compose up db
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - braid-db:/var/lib/postgresql/data
     healthcheck:
