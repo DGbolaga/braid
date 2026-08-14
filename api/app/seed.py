@@ -27,11 +27,13 @@ from app.db import SessionLocal
 from app.models import (
     Account,
     Application,
+    ApplicationResumeToken,
     AuditEvent,
     Broadcast,
     DraftPair,
     FormVersion,
     Invite,
+    MagicLinkToken,
     MatchingRecipe,
     Message,
     MessageTemplate,
@@ -43,6 +45,7 @@ from app.models import (
     Resource,
     Run,
     RunUnmatched,
+    SessionToken,
     Strand,
     StrandMember,
 )
@@ -74,8 +77,17 @@ def uid(value: str) -> uuid.UUID:
 
 
 def wipe(db: Session) -> None:
-    """Clear in dependency order. Seeding is a reset, not an append."""
+    """Clear in dependency order. Seeding is a reset, not an append.
+
+    Sessions and tokens go too. They reference accounts, so leaving them behind
+    breaks the wipe with a foreign-key violation the moment anybody has signed
+    in — and a session pointing at an account that no longer exists would be
+    worse than being signed out.
+    """
     for model in (
+        ApplicationResumeToken,
+        SessionToken,
+        MagicLinkToken,
         RunUnmatched,
         DraftPair,
         Run,
@@ -139,6 +151,7 @@ def seed(db: Session, data: dict[str, Any]) -> dict[str, int]:
     # The fixture roster carries the account inline, because on the wire a
     # roster entry is a participation with its person attached.
     coordinator_ids = {p["id"] for p in data["session"]["participations"]}
+    me_id = data["session"]["account"]["id"]
     headlines, skills = _member_details(data)
 
     for entry in data["roster"]:
@@ -168,6 +181,42 @@ def seed(db: Session, data: dict[str, Any]) -> dict[str, int]:
                 skills=skills.get(entry["id"], []),
                 matched=bool(entry.get("matched")),
                 joined_at=parse_dt(entry.get("joinedAt")),
+            )
+        )
+    db.flush()
+
+    # A membership in another organisation, with no roster, strands or runs
+    # behind it. The fixtures carry one deliberately: it is what proves role
+    # lives on the participation — the same person is a coordinator and mentor
+    # here and a mentee there — and it is the only thing that exercises the
+    # programme switcher and the "my programmes" screen.
+    for other in data["session"]["participations"]:
+        if uid(other["id"]) in {uid(e["id"]) for e in data["roster"]}:
+            continue
+        other_org = Organisation(
+            slug=other["orgSlug"],
+            name=other.get("organisationName") or other["orgSlug"],
+        )
+        db.add(other_org)
+        db.flush()
+        other_program = Program(
+            id=uid(other["programId"]),
+            organisation_id=other_org.id,
+            slug=other["programSlug"],
+            name=other["programName"],
+            state="open",
+            open_roles=[],
+        )
+        db.add(other_program)
+        db.flush()
+        db.add(
+            Participation(
+                id=uid(other["id"]),
+                account_id=uid(me_id),
+                program_id=other_program.id,
+                role=other["role"],
+                status=other["status"],
+                is_coordinator=other.get("isCoordinator", False),
             )
         )
     db.flush()

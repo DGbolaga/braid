@@ -353,6 +353,41 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+  /auth/demo:
+    post:
+      operationId: signInAsDemo
+      tags: [Auth]
+      summary: Sign in as a seeded demo account
+      description: |
+        Exists so somebody reviewing a deployed copy can get inside the product.
+        The seeded accounts have example.org addresses nobody can receive mail
+        at, so the magic-link path is closed to a reviewer, and a sign-in form
+        they cannot pass is the same as no deployment at all.
+
+        Returns 404 unless the service was started with demo mode explicitly
+        enabled, so it is absent rather than merely unadvertised. It signs in as
+        an existing seeded account and creates nothing.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DemoSignInRequest"
+      responses:
+        "200":
+          description: Session opened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Demo mode is off, or the seed is not loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+
   /auth/signout:
     post:
       operationId: signOut
@@ -2421,6 +2456,17 @@ components:
       properties:
         token:
           type: string
+
+    DemoSignInRequest:
+      type: object
+      required: [as]
+      properties:
+        as:
+          type: string
+          description: |
+            Which side of the product to look at. `coordinator` lands on the
+            admin screens, `participant` on a mentee's own.
+          enum: [coordinator, participant]
 
     Account:
       type: object

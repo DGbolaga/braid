@@ -1,4 +1,5 @@
 import { PublicMain } from "@/components/shell/public-shell";
+import { DemoEntry } from "./demo-entry";
 import { SignInForm } from "./signin-form";
 
 export const metadata = { title: "Sign in" };
@@ -15,6 +16,10 @@ export default function SignInPage() {
         No password. We email you a link that signs you in.
       </p>
       <SignInForm />
+
+      {/* Only on a deployment that opted in. The endpoint behind it 404s
+          otherwise, so this is an affordance rather than the control. */}
+      {process.env.NEXT_PUBLIC_DEMO_MODE === "true" && <DemoEntry />}
     </PublicMain>
   );
 }

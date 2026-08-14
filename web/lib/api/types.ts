@@ -214,6 +214,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/demo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in as a seeded demo account
+         * @description Exists so somebody reviewing a deployed copy can get inside the product.
+         *     The seeded accounts have example.org addresses nobody can receive mail
+         *     at, so the magic-link path is closed to a reviewer, and a sign-in form
+         *     they cannot pass is the same as no deployment at all.
+         *
+         *     Returns 404 unless the service was started with demo mode explicitly
+         *     enabled, so it is absent rather than merely unadvertised. It signs in as
+         *     an existing seeded account and creates nothing.
+         */
+        post: operations["signInAsDemo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/signout": {
         parameters: {
             query?: never;
@@ -1443,6 +1470,14 @@ export interface components {
         };
         VerifyRequest: {
             token: string;
+        };
+        DemoSignInRequest: {
+            /**
+             * @description Which side of the product to look at. `coordinator` lands on the
+             *     admin screens, `participant` on a mentee's own.
+             * @enum {string}
+             */
+            as: "coordinator" | "participant";
         };
         Account: {
             /** Format: uuid */
@@ -2737,6 +2772,39 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             /** @description Token expired or already used */
             410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    signInAsDemo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DemoSignInRequest"];
+            };
+        };
+        responses: {
+            /** @description Session opened */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            /** @description Demo mode is off, or the seed is not loaded */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
