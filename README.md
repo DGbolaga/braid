@@ -32,6 +32,8 @@ Braid is a constrained assignment system with an explicit fairness objective:
 
 ## Running it
 
+Full runbook: [RUNNING.md](RUNNING.md).
+
 **Frontend on its own** — no backend or database needed. MSW intercepts every
 request and serves deterministic fixtures on a fixed clock.
 
