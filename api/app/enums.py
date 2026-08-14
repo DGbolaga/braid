@@ -155,3 +155,9 @@ class AuditAction(StrEnum):
     BROADCAST_SENT = "broadcast_sent"
     TEMPLATE_EDITED = "template_edited"
     DATA_EXPORTED = "data_exported"
+
+
+class DecisionKind(StrEnum):
+    APPROVE = "approve"
+    WAITLIST = "waitlist"
+    REJECT = "reject"
