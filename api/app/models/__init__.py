@@ -13,7 +13,12 @@ from app.models.auth import (
     SessionToken,
 )
 from app.models.core import Account, Organisation, Participation, Program
-from app.models.forms import Application, ApplicationDraft, FormVersion
+from app.models.forms import (
+    Application,
+    ApplicationDraft,
+    FormVersion,
+    WaitlistEntry,
+)
 from app.models.matching import (
     DraftPair,
     MatchingRecipe,
@@ -31,6 +36,7 @@ from app.models.programme import (
 from app.models.strands import Message, MessageRead, Strand, StrandMember
 
 __all__ = [
+    "WaitlistEntry",
     "Account",
     "Application",
     "ApplicationDraft",

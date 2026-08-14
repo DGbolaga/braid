@@ -72,6 +72,10 @@ from the sign-in screen.
 | Broadcast | `…/programs/{programId}/comms` |
 | Report — coverage, funnel, fairness, demographics | `…/programs/{programId}/reports` |
 | Audit log | `/admin/o/she-code-africa/audit` |
+| Account settings — name, email preferences, mute, leave | `/settings` |
+| My programmes | `/programs` |
+| Accepting an invitation | `/invite/invite-pending` |
+| Save and resume a part-filled application | `…/apply?role=mentee` |
 | Research writing programme (a second org, different form) | `/o/unilag/p/research-writing-2026` |
 
 `programId` is `00000002-0000-4000-8000-000000000001`.
@@ -102,12 +106,26 @@ the people who ticked the optional reporting consent — 8 of 22 in the seeded
 cohort, not all 22 — and it withholds any group of three or fewer rather than
 rounding it, saying how many it withheld.
 
-## Not yet on the real backend
+### The other thing worth looking at
 
-These screens still show an error against the real API. Switch
-`NEXT_PUBLIC_API_MOCKING=enabled` to see them working against the mock.
+Open **http://localhost:3000/invite/invite-pending** in a window with no
+session. It is what an emailed invitation looks like arriving cold: Amara's note
+is there, the address it was sent to is named, and accepting asks for a name and
+nothing else. Accept it and you land inside the programme already signed in,
+never having seen the sign-in screen.
 
-- Account settings and my programmes
+The other two tokens are the states that matter more: `invite-expired` explains
+what lapsed and offers to ask for a new one, and `invite-known` is the same
+address as an existing account, so it says so rather than letting somebody fear
+they are about to create a duplicate.
+
+## Everything is on the real backend
+
+All 60 operations in `openapi.yaml` are implemented. There is no screen left
+that needs the mock.
+
+`NEXT_PUBLIC_API_MOCKING=enabled` still works and still serves the whole app —
+useful for running the frontend with no database at all.
 
 ## Signing in for real
 

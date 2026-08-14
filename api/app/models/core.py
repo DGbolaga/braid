@@ -12,6 +12,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy import true as sa_true
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -86,6 +87,27 @@ class Account(UUIDPrimaryKey, Timestamped, Base):
         Boolean, nullable=False, default=False
     )
     photo_url: Mapped[str | None] = mapped_column(Text)
+
+    # One switch per kind of mail, as columns rather than a JSON blob: these are
+    # read on the way out of every send, and a fixed set of five is exactly the
+    # shape that rots when it is stored as free-form. Defaults are on, except
+    # the digest, because somebody who never opens settings should still hear
+    # that they have been matched.
+    notify_new_message: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa_true()
+    )
+    notify_match_published: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa_true()
+    )
+    notify_milestone_reminders: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa_true()
+    )
+    notify_broadcasts: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=sa_true()
+    )
+    digest_frequency: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="weekly", server_default="weekly"
+    )
 
     participations: Mapped[list["Participation"]] = relationship(
         back_populates="account"

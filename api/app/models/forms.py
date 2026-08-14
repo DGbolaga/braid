@@ -86,6 +86,32 @@ class ApplicationDraft(UUIDPrimaryKey, Timestamped, Base):
     )
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     email: Mapped[str | None] = mapped_column(String(320), index=True)
+    # The version the answers were typed against. Without it a draft resumed
+    # after the form was republished would be validated against questions its
+    # author never saw, and answer ids that no longer exist would look like
+    # deliberate blanks.
+    form_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("form_version.id")
+    )
     answers: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict
     )
+
+
+class WaitlistEntry(UUIDPrimaryKey, Timestamped, Base):
+    """Somebody who arrived after applications closed and asked to be told.
+
+    Kept separate from Application on purpose: this person has answered nothing
+    and consented to nothing beyond being contacted once. Putting them in the
+    roster's table would make them countable as an applicant, which they are
+    not.
+    """
+
+    __tablename__ = "waitlist_entry"
+    __table_args__ = (UniqueConstraint("program_id", "email"),)
+
+    program_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("program.id"), nullable=False, index=True
+    )
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    role: Mapped[str | None] = mapped_column(String(16))

@@ -29,6 +29,7 @@ from app.matching import normalise
 from app.models import (
     Account,
     Application,
+    ApplicationDraft,
     ApplicationResumeToken,
     AuditEvent,
     Broadcast,
@@ -52,6 +53,7 @@ from app.models import (
     SessionToken,
     Strand,
     StrandMember,
+    WaitlistEntry,
 )
 
 DATA = Path(__file__).resolve().parent.parent / "seed_data.json"
@@ -90,6 +92,10 @@ def wipe(db: Session) -> None:
     """
     for model in (
         ApplicationResumeToken,
+        # Drafts hold a form_version_id, so they have to go before the versions
+        # they point at — and before the resume tokens that point at them.
+        ApplicationDraft,
+        WaitlistEntry,
         SessionToken,
         MagicLinkToken,
         RunUnmatched,

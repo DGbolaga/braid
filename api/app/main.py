@@ -6,9 +6,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.errors import install_error_handlers
 from app.routers import (
+    account,
     applications,
     auth,
     insight,
+    invites,
     matching,
     monitoring,
     participant,
@@ -74,6 +76,8 @@ for router in (
     setup,
     monitoring,
     insight,
+    account,
+    invites,
 ):
     app.include_router(router.router, prefix=V1)
 
