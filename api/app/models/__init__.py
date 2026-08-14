@@ -14,7 +14,13 @@ from app.models.auth import (
 )
 from app.models.core import Account, Organisation, Participation, Program
 from app.models.forms import Application, ApplicationDraft, FormVersion
-from app.models.matching import DraftPair, MatchingRecipe, Run, RunUnmatched
+from app.models.matching import (
+    DraftPair,
+    MatchingRecipe,
+    ParticipantAttribute,
+    Run,
+    RunUnmatched,
+)
 from app.models.programme import (
     AuditEvent,
     Broadcast,
@@ -41,6 +47,7 @@ __all__ = [
     "MessageTemplate",
     "NotificationPreference",
     "Organisation",
+    "ParticipantAttribute",
     "Participation",
     "Program",
     "ProgramMilestone",

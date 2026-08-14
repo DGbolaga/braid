@@ -2,8 +2,17 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -126,3 +135,40 @@ class RunUnmatched(UUIDPrimaryKey, Base):
     reason: Mapped[str] = mapped_column(String(32), nullable=False)
 
     run: Mapped[Run] = relationship(back_populates="unmatched")
+
+
+class ParticipantAttribute(UUIDPrimaryKey, Base):
+    """One flagged answer, projected into a fixed typed shape.
+
+    This is the boundary architecture 3.1 describes: the application form is
+    unknown at compile time, but everything downstream — matching, reporting,
+    export — reads this table, which always has the same columns. The unknown
+    schema stops here and nowhere else.
+
+    Rebuilt rather than maintained. It is a projection of the answers, so it can
+    be thrown away and recomputed at any time, which is what makes a change to
+    the flags on a question safe.
+    """
+
+    __tablename__ = "participant_attribute"
+    __table_args__ = (UniqueConstraint("participation_id", "field_id"),)
+
+    participation_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("participation.id"), nullable=False, index=True
+    )
+    program_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("program.id"), nullable=False, index=True
+    )
+    field_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+
+    #: The flags that put it here. A question may feed both scores.
+    matching: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    equity: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    field_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: Exactly one of these carries the value, chosen by field_type.
+    text_value: Mapped[str | None] = mapped_column(Text)
+    number_value: Mapped[float | None] = mapped_column(Float)
+    option_values: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=False, default=list
+    )

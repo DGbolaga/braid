@@ -16,6 +16,8 @@ dependencies = [
     # pydantic's EmailStr needs this, and the contract uses format: email
     # in enough places that it is not optional.
     "email-validator>=2.2",
+    "scipy>=1.14",
+    "numpy>=2.1",
 ]
 
 [dependency-groups]

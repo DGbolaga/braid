@@ -20,9 +20,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app import seed_applications
 from app.db import SessionLocal
 from app.models import (
     Account,
@@ -36,9 +37,11 @@ from app.models import (
     MagicLinkToken,
     MatchingRecipe,
     Message,
+    MessageRead,
     MessageTemplate,
     NotificationPreference,
     Organisation,
+    ParticipantAttribute,
     Participation,
     Program,
     ProgramMilestone,
@@ -90,7 +93,9 @@ def wipe(db: Session) -> None:
         MagicLinkToken,
         RunUnmatched,
         DraftPair,
+        ParticipantAttribute,
         Run,
+        MessageRead,
         Message,
         StrandMember,
         Strand,
@@ -473,10 +478,42 @@ def seed(db: Session, data: dict[str, Any]) -> dict[str, int]:
             )
         )
 
+    # Derive load and matched from the strands actually seeded rather than
+    # trusting the figures in the fixtures. Those were display data — they add
+    # up to fourteen against five strands — and a mentor recorded as full while
+    # holding nothing would make every later run look broken while behaving
+    # correctly.
+    db.flush()
+    for participation in db.scalars(
+        select(Participation).where(Participation.program_id == program.id)
+    ).all():
+        held = db.scalar(
+            select(func.count())
+            .select_from(StrandMember)
+            .join(Strand, Strand.id == StrandMember.strand_id)
+            .where(
+                StrandMember.participation_id == participation.id,
+                Strand.state == "active",
+            )
+        ) or 0
+        participation.matched = held > 0
+        if participation.role == "mentor":
+            participation.load = held
+
+    # Priority bands come from the run's draft pairs, which is where the
+    # fixtures record them.
+    bands = {}
+    for run in data["runs"]:
+        for pair in run.get("pairs", []):
+            bands[pair["mentee"]["name"]] = pair["priorityBand"]
+
+    backfilled = seed_applications.backfill(db, program.id, bands)
+
     db.commit()
 
     return {
         "organisations": 1,
+        "applications_backfilled": backfilled,
         "programs": 1,
         "accounts": len(data["roster"]),
         "participations": len(data["roster"]),

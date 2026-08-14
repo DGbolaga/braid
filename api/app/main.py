@@ -5,7 +5,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.errors import install_error_handlers
-from app.routers import auth, participant, public, roster, strands
+from app.routers import (
+    auth,
+    matching,
+    participant,
+    public,
+    roster,
+    strands,
+    unmatched,
+)
 
 settings = get_settings()
 
@@ -50,7 +58,7 @@ V1 = "/v1"
 # this every failure in the interface renders as undefined.
 install_error_handlers(app)
 
-for router in (auth, public, roster, strands, participant):
+for router in (auth, public, roster, strands, participant, matching, unmatched):
     app.include_router(router.router, prefix=V1)
 
 
