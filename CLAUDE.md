@@ -6,7 +6,18 @@ Rules for working in this repository. Read before any task. These are constraint
 
 ## What this is
 
-Braid, a mentoring platform. Next.js frontend, FastAPI backend in a separate repo. This repo is frontend only.
+Braid, a mentoring platform. A monorepo: Next.js frontend in `web/`, FastAPI backend in `api/`, and the OpenAPI contract at the root where both read it.
+
+```
+openapi.yaml        the contract — one copy, both sides read it
+docker-compose.yml  db, and api + web once they exist
+docs/               architecture, design direction, brand reference
+design/             design files (.dc.html)
+web/                the Next.js app
+api/                FastAPI — not built yet, see api/README.md
+```
+
+**Paths in this file are relative to `web/`** unless they are one of the root entries above. `npm` commands run from `web/`. `openapi.yaml` and `docs/` are at the root, so `npm run gen:api` reads `../openapi.yaml`.
 
 Reference docs, read the relevant one before building:
 
@@ -18,13 +29,17 @@ Reference docs, read the relevant one before building:
 
 ## Commands
 
+All from `web/`:
+
 ```bash
 npm run dev        # next dev, http://localhost:3000, MSW on
-npm run build      # next build. MSW intercepts during the build too
+npm run build      # next build
 npm run lint       # eslint
 npx tsc --noEmit   # the type check; strict, and it catches what lint does not
-npm run gen:api    # openapi.yaml -> lib/api/types.ts. Run after every contract edit
+npm run gen:api    # ../openapi.yaml -> lib/api/types.ts. Run after every contract edit
 ```
+
+**A production build has no mock backend.** Mocking is gated to `NODE_ENV === "development"`, so `next start` without a real API returns 500 on every page that fetches. That is expected, not a regression — the frontend cannot be usefully deployed until `api/` exists.
 
 There is no test runner and no test files. Verification is `npx tsc --noEmit`, `npm run lint`, and the app itself. `/ui` renders every primitive in every state (dev only, `notFound()` in production) and is the fastest way to see a primitive change.
 
