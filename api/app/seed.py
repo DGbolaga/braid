@@ -23,7 +23,7 @@ from typing import Any
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app import seed_applications
+from app import seed_applications, seed_research
 from app.db import SessionLocal
 from app.models import (
     Account,
@@ -509,11 +509,17 @@ def seed(db: Session, data: dict[str, Any]) -> dict[str, int]:
 
     backfilled = seed_applications.backfill(db, program.id, bands)
 
+    # The second programme, filled in so every screen inside it is real. It asks
+    # entirely different questions, which is the dynamic form schema working
+    # rather than being claimed.
+    research = seed_research.seed(db, uid(me_id))
+
     db.commit()
 
     return {
         "organisations": 1,
         "applications_backfilled": backfilled,
+        **research,
         "programs": 1,
         "accounts": len(data["roster"]),
         "participations": len(data["roster"]),
