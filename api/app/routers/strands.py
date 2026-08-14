@@ -138,6 +138,22 @@ def send_message(
             "new can be sent.",
         )
 
+    # A retry after a dropped response is the same send, not a second one. The
+    # client token is what makes that decidable, and this is the case that
+    # actually happens: somebody on a phone taps send, the connection stalls,
+    # and the app tries again. Without this the mentor reads the same sentence
+    # twice and neither of them knows why.
+    if body.client_token:
+        already_sent = db.scalar(
+            select(Message).where(
+                Message.strand_id == strand.id,
+                Message.author_participation_id == me.id,
+                Message.client_token == body.client_token,
+            )
+        )
+        if already_sent is not None:
+            return svc.to_message(db, already_sent, svc.author_accounts(db, strand))
+
     now = datetime.now(UTC)
     message = Message(
         strand_id=strand.id,
