@@ -8,6 +8,7 @@ from app.errors import install_error_handlers
 from app.routers import (
     applications,
     auth,
+    insight,
     matching,
     monitoring,
     participant,
@@ -72,6 +73,7 @@ for router in (
     applications,
     setup,
     monitoring,
+    insight,
 ):
     app.include_router(router.router, prefix=V1)
 

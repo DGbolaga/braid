@@ -59,12 +59,20 @@ export function LineChart({
 export function BarChart({
   points,
   caption,
+  empty,
   format = (n: number) => String(n),
 }: {
   points: Schemas["CountPoint"][];
   caption: string;
+  /** Why there is nothing here. A section that renders an axis and no bars
+      reads as a fault; saying what is missing is the state, not a fallback. */
+  empty: string;
   format?: (n: number) => string;
 }) {
+  if (points.length === 0) {
+    return <p className="type-body-s text-secondary">{empty}</p>;
+  }
+
   const max = Math.max(...points.map((p) => p.count), 1);
 
   return (
@@ -149,6 +157,15 @@ export function MilestoneProgress({
 }: {
   items: Schemas["MilestoneCompletion"][];
 }) {
+  if (items.length === 0) {
+    return (
+      <p className="type-body-s text-secondary">
+        This programme has no milestones set, so there is nothing to measure
+        progress against.
+      </p>
+    );
+  }
+
   return (
     <ul className="flex flex-col gap-12">
       {items.map((item) => {

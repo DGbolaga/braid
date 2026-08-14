@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app import seed_applications, seed_research
 from app.db import SessionLocal
+from app.matching import normalise
 from app.models import (
     Account,
     Application,
@@ -293,6 +294,12 @@ def seed(db: Session, data: dict[str, Any]) -> dict[str, int]:
             ended_at=parse_dt(strand_data.get("endedAt")),
             sessions_logged=metric.get("sessionsLogged", 0),
             milestones_completed=metric.get("milestonesCompleted", 0),
+            # The fixture's own date, not the moment of seeding. Without it
+            # every strand in a two-month cohort is created today, and anything
+            # that reads a strand against a calendar — coverage over time, the
+            # drop-off funnel — sees a programme where nothing happened until
+            # this morning.
+            created_at=parse_dt(strand_data.get("createdAt")),
         )
         db.add(strand)
 
@@ -514,11 +521,20 @@ def seed(db: Session, data: dict[str, Any]) -> dict[str, int]:
     # rather than being claimed.
     research = seed_research.seed(db, uid(me_id))
 
+    # The projection is derived data, so a fresh database has none until
+    # something rebuilds it — and until then the report has no equity answers to
+    # break down. Building it here means a seeded database is a *complete* one
+    # rather than one that only completes itself after somebody starts a run.
+    projected = normalise.rebuild(db, program.id)
+    if research:
+        projected += normalise.rebuild(db, seed_research.PROGRAM_ID)
+
     db.commit()
 
     return {
         "organisations": 1,
         "applications_backfilled": backfilled,
+        "attributes_projected": projected,
         **research,
         "programs": 1,
         "accounts": len(data["roster"]),

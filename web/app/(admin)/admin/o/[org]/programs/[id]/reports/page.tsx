@@ -158,6 +158,7 @@ export default async function ReportsPage(
         <BarChart
           points={report.sessionsByWeek}
           caption="Sessions logged, not scheduled. Logging is the engagement signal the health monitor and this report both read."
+          empty="A strand records how many sessions it has logged but not when any of them happened, so there is nothing to put on a week axis. This fills in once sessions are logged as dated entries."
         />
       </Section>
 
@@ -169,6 +170,7 @@ export default async function ReportsPage(
               ? `Check-in answers on a five-point scale, from ${percent(report.checkInResponseRate)} of participants. The rest did not reply, and the ones who do not reply are not a random sample.`
               : "Check-in answers on a five-point scale."
           }
+          empty="The mid-point check-in goes out as a message rather than a question with recorded answers, so there is nothing counted here yet."
         />
       </Section>
 
@@ -187,7 +189,11 @@ export default async function ReportsPage(
             {report.demographics.map((breakdown) => (
               <div key={breakdown.fieldId} className="flex flex-col gap-8">
                 <h3 className="type-label text-muted">{breakdown.label}</h3>
-                <BarChart points={breakdown.buckets} caption="" />
+                <BarChart
+                  points={breakdown.buckets}
+                  caption=""
+                  empty="Every group in this question was too small to show."
+                />
                 {breakdown.suppressedBuckets > 0 && (
                   <p className="type-caption text-muted">
                     {breakdown.suppressedBuckets}{" "}

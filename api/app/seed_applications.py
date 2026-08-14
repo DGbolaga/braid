@@ -145,7 +145,14 @@ def _build(
                 days_ago,
             )
         elif kind == "consent":
-            answers[field["id"]] = _answer(True, days_ago)
+            # A required consent is a condition of applying, so everybody who
+            # got in ticked it. An optional one is a real choice, and roughly a
+            # quarter of people say no — which is the whole point of seeding it
+            # unevenly: a report where everybody consented never exercises the
+            # gate that withholds the ones who did not.
+            optional = not field.get("required")
+            agreed = not optional or _stable_index(name + label, 4) != 0
+            answers[field["id"]] = _answer(agreed, days_ago)
 
     return answers
 

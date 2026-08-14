@@ -70,6 +70,8 @@ from the sign-in screen.
 | Coordinator dashboard | `/admin/o/she-code-africa` |
 | Strands monitor — health, nudge, pause, end | `…/programs/{programId}/strands` |
 | Broadcast | `…/programs/{programId}/comms` |
+| Report — coverage, funnel, fairness, demographics | `…/programs/{programId}/reports` |
+| Audit log | `/admin/o/she-code-africa/audit` |
 | Research writing programme (a second org, different form) | `/o/unilag/p/research-writing-2026` |
 
 `programId` is `00000002-0000-4000-8000-000000000001`.
@@ -83,12 +85,28 @@ ordering is the point — the distribution before the names.
 
 Then press **Publish** and the strands appear on the participant side.
 
+Now open **Reports**. Two sections change because of what you just did:
+coverage over time steps up on today's date, and *match quality by priority
+band* fills in — it was empty before, because it reports the figures from a
+**published** run rather than recomputing its own. Every other figure on that
+page is derived at read time, so nothing there is a counter anybody has to
+remember to increment.
+
+Two sections stay empty on purpose, and say why on the page: sessions are a
+per-strand total with no dates, and the mid-point check-in is a message rather
+than a question with recorded answers. Neither can be put on an axis honestly,
+so neither is.
+
+**Who is in the programme** is the part worth reading closely. It counts only
+the people who ticked the optional reporting consent — 8 of 22 in the seeded
+cohort, not all 22 — and it withholds any group of three or fewer rather than
+rounding it, saying how many it withheld.
+
 ## Not yet on the real backend
 
 These screens still show an error against the real API. Switch
 `NEXT_PUBLIC_API_MOCKING=enabled` to see them working against the mock.
 
-- Reports, audit log
 - Account settings and my programmes
 
 ## Signing in for real
