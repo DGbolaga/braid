@@ -1,36 +1,127 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Braid
 
-## Getting Started
+An equitable mentorship pairing engine. Built for Mentor Me Collective's Grow
+with Google programme, 2026 cohort, against UN SDG Goal 5.
 
-First, run the development server:
+**This repository is the frontend.** It runs standalone against a mock backend;
+the FastAPI service and PostgreSQL database are the next phase.
+
+---
+
+## The problem
+
+Most mentoring platforms solve a **discovery** problem — two people never met,
+and software introduces them. Braid solves an **allocation** problem: in a
+cohort with two hundred mentees and twenty-five available mentors, nobody
+struggles to find a mentor. There are not enough, and something has to decide
+who gets one.
+
+That decision is currently made by whoever applied first, whoever wrote the
+most polished application, or a coordinator working a spreadsheet at midnight.
+Each quietly favours the applicant with the most access already.
+
+Braid is a constrained assignment system with an explicit fairness objective:
+**it decides how a scarce resource is distributed, and it shows its working.**
+
+## Running it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+No backend or database required. MSW intercepts every request and serves
+deterministic fixtures on a fixed clock, in Node and in the browser.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build        # production build
+npm run lint         # eslint
+npx tsc --noEmit     # type check, strict
+npm run gen:api      # regenerate lib/api/types.ts from openapi.yaml
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+There is no test runner. Verification is the type check, the linter, `/ui`
+(every primitive in every state, dev only), and the app itself.
 
-## Learn More
+### Where to look
 
-To learn more about Next.js, take a look at the following resources:
+Seeded organisation `she-code-africa`, programme `backend-cohort-4`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Route | What it shows |
+|---|---|
+| `/p/she-code-africa/backend-cohort-4` | Programme landing |
+| `/p/she-code-africa/backend-cohort-4/apply?role=mentee` | Dynamic application form |
+| `/o/she-code-africa/p/backend-cohort-4` | Participant home |
+| `/admin/o/she-code-africa` | Coordinator dashboard |
+| `/admin/o/she-code-africa/runs/00000006-0000-4000-8000-000000000003` | Run review, fairness summary first |
+| `/ui` | Every UI primitive in every state |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The app starts signed in as a coordinator who is also a mentor: role lives on
+the participation, never on the account.
 
-## Deploy on Vercel
+## How it is put together
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Contract first.** Every endpoint exists in `openapi.yaml` before any screen
+is written, and `lib/api/types.ts` is generated from it. No response type is
+hand-written. 48 endpoints, 144 schemas.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**The unknown form schema stops at one boundary.** Coordinators build their own
+application forms, so the shape is unknown at compile time. Form definitions are
+versioned JSON with stable ids; answers are keyed by id and never by question
+text, so renaming a question does not orphan existing answers. An application
+keeps the version it was answered against, permanently.
+
+**One form renderer, four consumers** — apply wizard, profile edit, form-builder
+preview, application review. A question added in the builder reaches all four
+with no further work, and the preview cannot drift from what applicants see.
+
+**Tokens are enforced by the build.** `styles/tokens.css` resets Tailwind's
+palette and scale to `initial`, so `text-gray-500` and `p-13` are not classes.
+
+**Two orderings carry ethical weight and should not be "improved":** the
+fairness summary sits above the pair list on run review, and the criteria test
+run returns a fairness summary with no pairs at all. Both stop a coordinator
+optimising pair by pair, which is the behaviour that reproduces the access gap.
+
+### Stack
+
+Next.js 16 (App Router), TypeScript strict, Tailwind v4 themed through CSS
+custom properties, `react-hook-form` + `zod`, `@tanstack/react-query` for client
+mutations and polling only, MSW for mocking, `openapi-typescript` for types.
+
+No dependency was added for anything the platform provides: charts are
+hand-drawn SVG, dialogues are the native `<dialog>` element, PDF export is the
+print stylesheet.
+
+## Layout
+
+```
+app/
+  (public)/        no session — landing, apply, sign in, verify, invite
+  (account)/       session only — settings, my programmes
+  (participant)/   /o/[org]/p/[program]/…
+  (admin)/         /admin/o/[org]/…  desktop-first
+components/        ui primitives, form renderer, shells
+lib/
+  api/             typed clients, MSW handlers, fixtures
+  form/            conditions, zod schema, JSON schema, serialisation
+styles/tokens.css  the single source of colour, type and spacing
+openapi.yaml       the contract the backend implements
+docs/              architecture, design direction, brand reference
+```
+
+`docs/architecture.md` is the fullest description of the system — core model,
+every page, the four shells. Code comments cite it by section number.
+
+## Status
+
+Frontend complete: 32 routes, no placeholder screens, each with empty, loading
+and error states.
+
+Not built yet: the FastAPI backend and PostgreSQL database, taxonomy and
+normalisation of free text to canonical skills, per-pair score attribution,
+pair-level run actions (swap, lock, reject), group strands proposed by a run.
+
+## Licence
+
+MIT.
