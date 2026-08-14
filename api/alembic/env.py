@@ -1,15 +1,15 @@
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.config import get_settings
-from app.db import Base
+from alembic import context
 
 # Imported for the side effect: every model must be registered on Base.metadata
 # before autogenerate runs, or a missing import silently produces a migration
 # that drops the table.
 from app import models  # noqa: F401
+from app.config import get_settings
+from app.db import Base
 
 config = context.config
 
