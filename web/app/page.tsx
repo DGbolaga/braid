@@ -1,22 +1,32 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { OrganisationsLanding } from "@/components/marketing/organisations-landing";
 import { getSession } from "@/lib/auth/guard";
 
+export const metadata: Metadata = {
+  title: "Braid — matching that a coordinator can stand behind",
+  description:
+    "Braid takes a mentoring round from open applications to published pairs, with a fairness summary, an audit trail, and every decision left in your hands.",
+};
+
 /**
- * The root is a signpost, not a page.
+ * The root does two jobs, because it has two audiences.
  *
- * Braid has no single landing page because a landing page belongs to a
- * programme rather than to the product — She Code Africa's cohort and UniLag's
- * writing programme each have their own at `/p/:org/:program`, and that is the
- * link a coordinator actually sends out. Architecture 2 starts its sitemap
- * there for that reason.
+ * Signed out it is the product's front door — the "Braid for organisations"
+ * page, which is design-direction 5.2 place five. This is distinct from the
+ * *programme* landing page at `/p/:org/:program`: that one recruits
+ * participants into one cohort and is the link a coordinator sends out, while
+ * this one addresses the coordinator deciding whether to run a cohort at all.
+ * Architecture 2 starts its sitemap at the programme landing for that reason,
+ * and never says what the root does — this fills the gap rather than
+ * overriding it.
  *
- * What it must not be is a 404. Somebody who types the bare domain has either
- * been here before or is about to sign in, so this sends them to whichever is
- * true rather than to nothing.
+ * Signed in it is a signpost, because somebody who is already a member does
+ * not need to be sold the product they are using.
  */
 export default async function RootPage() {
   const session = await getSession();
-  if (!session) redirect("/signin");
+  if (!session) return <OrganisationsLanding />;
 
   const { participations } = session;
 
