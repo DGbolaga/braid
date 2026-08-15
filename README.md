@@ -207,11 +207,22 @@ If you would rather drive it yourself, this is the order that shows the most:
 
 ## 🛠️ Running it
 
-Three parts: Postgres, the FastAPI backend, the Next.js frontend.
+Three parts: Postgres, the FastAPI backend, the Next.js frontend. All three at
+once, if you would rather not set up Python and Node:
+
+```bash
+docker compose up --build
+docker compose exec api python -m app.seed    # once, for the sample cohort
+```
+
+Then **http://localhost:3000/signin**. Sign-in links are written to the api's
+log rather than sent, so `docker compose logs api` is where to read them.
+
+Or from source, which is better if you are going to change anything:
 
 ```bash
 # 1. Database (from the repo root)
-DB_PORT=5433 docker compose up -d db
+docker compose up -d db
 
 # 2. Backend
 cd api
@@ -229,7 +240,7 @@ npm run dev
 
 Open **http://localhost:3000/signin** and choose **Explore as a coordinator** or **Explore as a participant**.
 
-`DB_PORT=5433` is only needed if you already run Postgres on 5432; it must match `DATABASE_URL` in `api/.env`.
+Postgres is published on **5433** rather than 5432, so it does not collide with one you may already be running; `api/.env.example` already points there. Set `DB_PORT` to move it.
 
 **Frontend only, no database required.** Set `NEXT_PUBLIC_API_MOCKING=enabled` in `web/.env.local` and run `npm run dev`. A full mock backend serves every screen.
 
@@ -239,7 +250,9 @@ Open **http://localhost:3000/signin** and choose **Explore as a coordinator** or
 cd api && uv run python -m app.seed
 ```
 
-Full run guide: [`RUNNING.md`](RUNNING.md). Project documents: [`docs/project/`](docs/project/).
+Full run guide: [`RUNNING.md`](RUNNING.md). Putting a copy somewhere other people
+can reach it: [`DEPLOYING.md`](DEPLOYING.md). Project documents:
+[`docs/project/`](docs/project/).
 
 ---
 
