@@ -115,6 +115,10 @@ export function RunReview({
   }
 
   const working = run.state === "queued" || run.state === "running";
+  // Reachable two ways: the engine caught its own failure, or the server was
+  // restarted mid-run and the sweep tidied up after it. Neither leaves anything
+  // to review, and an empty pair list with no explanation reads as a bug.
+  const stopped = run.state === "discarded";
   const unmatchedHref = `/admin/o/${orgSlug}/programs/${run.programId}/unmatched`;
 
   return (
@@ -134,11 +138,21 @@ export function RunReview({
 
       {working && <RunProgress progress={run.progress} />}
 
-      {!working && run.fairnessSummary && (
+      {stopped && (
+        <section className="flex flex-col gap-8 rounded-md border border-subtle bg-sunken p-16">
+          <h2 className="type-heading-s text-primary">This run did not finish</h2>
+          <p className="type-body-m text-secondary">
+            It stopped before drafting any pairs. Nothing was matched and nobody
+            was told anything, so starting a new run is safe.
+          </p>
+        </section>
+      )}
+
+      {!working && !stopped && run.fairnessSummary && (
         <FairnessSummary summary={run.fairnessSummary} />
       )}
 
-      {!working && (
+      {!working && !stopped && (
         <>
           <HowScored run={run} />
 
