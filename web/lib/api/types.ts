@@ -2628,6 +2628,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     joinWaitlist: {
@@ -2659,6 +2660,7 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getApplicationDraft: {
@@ -2839,6 +2841,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     signOut: {
@@ -3260,6 +3263,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     requestNewInvite: {
@@ -4088,6 +4092,7 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+            429: components["responses"]["TooManyRequests"];
         };
     };
     getRun: {
@@ -4297,6 +4302,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            429: components["responses"]["TooManyRequests"];
         };
     };
 }

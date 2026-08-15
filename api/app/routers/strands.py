@@ -5,6 +5,7 @@ from fastapi import APIRouter, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import limits
 from app.deps import CurrentAccount, DbSession, participation_in
 from app.enums import StrandState
 from app.errors import Problem, forbidden, not_found
@@ -126,6 +127,11 @@ def send_message(
     if strand is None:
         raise not_found("strand")
     me = _my_participation(db, account, strand)
+
+    # Keyed on the participation rather than the source: the sender is
+    # authenticated here, so there is something better to count than an address
+    # they can change.
+    limits.enforce("message_send", str(me.id), limits.MESSAGE_SEND)
 
     text = body.body.strip()
     if not text:

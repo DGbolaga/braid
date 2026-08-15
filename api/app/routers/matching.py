@@ -5,6 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import limits
 from app.db import SessionLocal
 from app.deps import CurrentAccount, DbSession, require_coordinator_of_program
 from app.enums import (
@@ -153,6 +154,11 @@ def create_run(
     a participant until it is published.
     """
     require_coordinator_of_program(db, account, program_id)
+
+    # Keyed on the programme, not the coordinator: the cost being bounded is the
+    # matching work, and a programme with three coordinators does not get three
+    # times the budget for it.
+    limits.enforce("run_create", str(program_id), limits.RUN_CREATE)
 
     in_flight = db.scalar(
         select(Run).where(

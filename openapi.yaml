@@ -164,6 +164,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /orgs/{orgSlug}/programs/{programSlug}/waitlist:
     parameters:
       - $ref: "#/components/parameters/OrgSlug"
@@ -199,6 +201,8 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /orgs/{orgSlug}/programs/{programSlug}/application-draft:
     parameters:
       - $ref: "#/components/parameters/OrgSlug"
@@ -388,6 +392,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /auth/signout:
     post:
       operationId: signOut
@@ -790,6 +796,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /invites/{token}/reissue:
     parameters:
       - name: token
@@ -1640,6 +1648,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
 
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
   /runs/{runId}:
     parameters:
       - $ref: "#/components/parameters/RunId"
@@ -1840,6 +1850,8 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
 components:
   securitySchemes:
     sessionCookie:
