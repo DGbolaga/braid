@@ -1158,7 +1158,7 @@ export interface paths {
         };
         /**
          * Read a strand's message thread
-         * @description Newest last. Page backwards with `before`.
+         * @description Newest last. Page backwards through history with `before`, or poll forwards for new arrivals with `since`. The two describe opposite directions and cannot be combined.
          */
         get: operations["listMessages"];
         put?: never;
@@ -4250,6 +4250,8 @@ export interface operations {
             query?: {
                 /** @description Return messages sent before this message id. */
                 before?: string;
+                /** @description Return only messages sent after this message id, oldest first. A thread with nothing new answers with an empty list, which is what makes polling cheap. */
+                since?: string;
                 limit?: number;
             };
             header?: never;

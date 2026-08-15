@@ -1796,11 +1796,23 @@ paths:
       operationId: listMessages
       tags: [Strands]
       summary: Read a strand's message thread
-      description: Newest last. Page backwards with `before`.
+      description: >
+        Newest last. Page backwards through history with `before`, or poll
+        forwards for new arrivals with `since`. The two describe opposite
+        directions and cannot be combined.
       parameters:
         - name: before
           in: query
           description: Return messages sent before this message id.
+          schema:
+            type: string
+            format: uuid
+        - name: since
+          in: query
+          description: >
+            Return only messages sent after this message id, oldest first. A
+            thread with nothing new answers with an empty list, which is what
+            makes polling cheap.
           schema:
             type: string
             format: uuid
